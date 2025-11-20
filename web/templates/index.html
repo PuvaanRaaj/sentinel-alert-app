@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Incident Alert Center (Go)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#020617">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: #020617;
+      color: #e5e7eb;
+    }
+    header {
+      padding: 12px 20px;
+      background: #020617;
+      border-bottom: 1px solid #1f2933;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    h1 { margin: 0; font-size: 18px; }
+    .subtitle { font-size: 12px; color: #9ca3af; }
+    .container { padding: 16px 20px 40px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 6px 6px;
+      border-bottom: 1px solid #1f2933;
+      vertical-align: top;
+    }
+    th {
+      text-align: left;
+      background: #020617;
+      position: sticky;
+      top: 50px;
+      z-index: 5;
+    }
+    tr:nth-child(even) td { background: #020817; }
+    .btn {
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      border: 1px solid #374151;
+      background: #020617;
+      color: #e5e7eb;
+      cursor: pointer;
+    }
+    .btn:hover { background: #111827; }
+    .pill {
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+    .pill-info { background: #1d4ed8; }
+    .pill-warning { background: #d97706; }
+    .pill-error { background: #b91c1c; }
+    .pill-default { background: #374151; }
+    .msg {
+      white-space: pre-wrap;
+      margin-top: 4px;
+      font-size: 12px;
+    }
+  </style>
+  <script>
+    // auto-refresh every 10 seconds
+    setInterval(function () {
+      window.location.reload();
+    }, 10000);
+
+    function levelClass(level) {
+      if (!level) return "pill-default";
+      level = String(level).toLowerCase();
+      if (level.includes("crit")) return "pill-error";
+      if (level.includes("error") || level.includes("fail") || level.includes("err")) return "pill-error";
+      if (level.includes("warn")) return "pill-warning";
+      if (level.includes("info")) return "pill-info";
+      return "pill-default";
+    }
+
+    window.addEventListener("DOMContentLoaded", function () {
+      document.querySelectorAll("[data-level]").forEach(function (el) {
+        var lvl = el.getAttribute("data-level") || "";
+        el.className = "pill " + levelClass(lvl);
+      });
+    });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/sw.js')
+          .then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          })
+          .catch(err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+  </script>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Incident Alert Center (Go)</h1>
+    <div class="subtitle">
+      Webhook: <code>/webhook</code> • Telegram mock: <code>/telegram/bot&lt;token&gt;/sendMessage</code>
+    </div>
+  </div>
+  <form method="post" action="/clear" onsubmit="return confirm('Clear all alerts?');">
+    <button class="btn" type="submit">Clear All</button>
+  </form>
+</header>
+<div class="container">
+  {{ if not .Alerts }}
+    <p>No alerts yet.</p>
+    <p>Send to: <code>http://localhost:8080/webhook</code> or <code>http://localhost:8080/telegram/botTOKEN/sendMessage</code></p>
+  {{ else }}
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 50px;">ID</th>
+        <th style="width: 170px;">Time (UTC)</th>
+        <th style="width: 140px;">Source</th>
+        <th style="width: 120px;">Level</th>
+        <th>Title / Message</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Alerts }}
+      <tr>
+        <td>#{{ .ID }}</td>
+        <td>{{ .CreatedAt.Format "2006-01-02 15:04:05" }}</td>
+        <td>{{ .Source }}</td>
+        <td>
+          <span data-level="{{ .Level }}">{{ .Level }}</span>
+        </td>
+        <td>
+          <strong>{{ .Title }}</strong>
+          <div class="msg">{{ .Message }}</div>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+  {{ end }}
+</div>
+</body>
+</html>
