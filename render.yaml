@@ -1,0 +1,28 @@
+services:
+  # Redis service
+  - type: redis
+    name: sentinel-redis
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+  # Web service
+  - type: web
+    name: sentinel-ops
+    runtime: docker
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: REDIS_ADDR
+        fromService:
+          type: redis
+          name: sentinel-redis
+          property: connectionString
+      - key: REDIS_PASSWORD
+        fromService:
+          type: redis
+          name: sentinel-redis
+          property: password
+      - key: REDIS_DB
+        value: 0

@@ -8,8 +8,8 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
 
-# Only copy go.mod first to leverage Docker layer caching
-COPY go.mod ./
+# Copy go.mod and go.sum (if exists) to leverage Docker layer caching
+COPY go.mod go.sum* ./
 RUN go mod download
 
 # Now copy the rest of the source
@@ -31,6 +31,12 @@ WORKDIR /home/appuser
 # Copy the compiled binary from builder
 COPY --from=builder /app/incident-viewer .
 
+# Copy web assets (templates and static files)
+COPY --from=builder /app/web ./web
+
+# Change ownership to appuser
+USER root
+RUN chown -R appuser:appuser /home/appuser
 USER appuser
 
 EXPOSE 8080

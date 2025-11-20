@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -13,11 +14,11 @@ import (
 )
 
 type Handler struct {
-	Store *store.Store
+	Store store.Store
 	Tmpl  *template.Template
 }
 
-func NewHandler(s *store.Store, tmpl *template.Template) *Handler {
+func NewHandler(s store.Store, tmpl *template.Template) *Handler {
 	return &Handler{
 		Store: s,
 		Tmpl:  tmpl,
@@ -30,12 +31,42 @@ func (h *Handler) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The template expects .Alerts.
-	alerts := h.Store.GetAlerts()
-	// We can pass alerts directly if we import models, but let's keep it simple.
+	alerts, err := h.Store.GetAlerts(r.Context())
+	if err != nil {
+		log.Println("Failed to get alerts:", err)
+		http.Error(w, "Failed to get alerts", http.StatusInternalServerError)
+		return
+	}
 
 	if err := h.Tmpl.Execute(w, map[string]any{"Alerts": alerts}); err != nil {
 		log.Println("template error:", err)
+	}
+}
+
+func (h *Handler) SSEHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Subscribe to Redis channel
+	pubsub := h.Store.Subscribe(r.Context())
+	defer pubsub.Close()
+
+	ch := pubsub.Channel()
+
+	// Send initial connection message (optional)
+	fmt.Fprintf(w, "data: %s\n\n", "connected")
+	w.(http.Flusher).Flush()
+
+	for {
+		select {
+		case msg := <-ch:
+			fmt.Fprintf(w, "data: %s\n\n", msg.Payload)
+			w.(http.Flusher).Flush()
+		case <-r.Context().Done():
+			return
+		}
 	}
 }
 
@@ -105,7 +136,12 @@ func (h *Handler) WebhookHandler(w http.ResponseWriter, r *http.Request) {
 		message = string(buf)
 	}
 
-	a := h.Store.AddAlert(source, level, title, message)
+	a, err := h.Store.AddAlert(r.Context(), source, level, title, message)
+	if err != nil {
+		log.Println("Failed to add alert:", err)
+		http.Error(w, "Failed to add alert", http.StatusInternalServerError)
+		return
+	}
 
 	resp := map[string]any{
 		"status":     "ok",
@@ -172,7 +208,12 @@ func (h *Handler) TelegramHandler(w http.ResponseWriter, r *http.Request) {
 		text = "(empty message)"
 	}
 
-	a := h.Store.AddAlert(source, level, title, text)
+	a, err := h.Store.AddAlert(r.Context(), source, level, title, text)
+	if err != nil {
+		log.Println("Failed to add alert:", err)
+		http.Error(w, "Failed to add alert", http.StatusInternalServerError)
+		return
+	}
 
 	resp := map[string]any{
 		"ok": true,
@@ -202,7 +243,7 @@ func (h *Handler) ClearHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	h.Store.ClearAlerts()
+	h.Store.ClearAlerts(r.Context())
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

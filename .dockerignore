@@ -1,0 +1,42 @@
+# Ignore build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Ignore test binary
+*.test
+
+# Ignore output from test coverage
+*.out
+
+# Ignore dependency directories
+vendor/
+
+# Ignore environment files
+.env
+.env.local
+
+# Ignore git
+.git
+.gitignore
+
+# Ignore docs
+*.md
+!README.md
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore Docker files
+Dockerfile*
+docker-compose.yml
+
+# Ignore local data
+data/
+*.log
