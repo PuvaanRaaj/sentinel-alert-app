@@ -247,6 +247,25 @@ func (h *Handler) ClearHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	level := r.URL.Query().Get("level")
+	source := r.URL.Query().Get("source")
+
+	alerts, err := h.Store.SearchAlerts(r.Context(), query, level, source)
+	if err != nil {
+		log.Println("Search error:", err)
+		http.Error(w, "Search failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"alerts": alerts,
+		"count":  len(alerts),
+	})
+}
+
 func getString(v any) string {
 	switch t := v.(type) {
 	case string:

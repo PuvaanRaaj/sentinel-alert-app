@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"incident-viewer-go/internal/models"
@@ -11,9 +12,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const (
+	alertTTL = 30 * 24 * time.Hour // 30 days
+)
+
 type Store interface {
 	AddAlert(ctx context.Context, source, level, title, message string) (models.Alert, error)
 	GetAlerts(ctx context.Context) ([]models.Alert, error)
+	SearchAlerts(ctx context.Context, query, level, source string) ([]models.Alert, error)
 	ClearAlerts(ctx context.Context) error
 	Subscribe(ctx context.Context) *redis.PubSub
 }
@@ -28,7 +34,7 @@ func NewRedisStore(opts *redis.Options) *RedisStore {
 }
 
 func (s *RedisStore) AddAlert(ctx context.Context, source, level, title, message string) (models.Alert, error) {
-	// Generate ID (simple increment for now, or use timestamp/uuid)
+	// Generate ID
 	id, err := s.client.Incr(ctx, "alert:next_id").Result()
 	if err != nil {
 		return models.Alert{}, err
@@ -42,20 +48,40 @@ func (s *RedisStore) AddAlert(ctx context.Context, source, level, title, message
 		Title:     title,
 		Message:   message,
 	}
-
 	data, err := json.Marshal(a)
 	if err != nil {
 		return models.Alert{}, err
 	}
 
-	// Store in a list or sorted set. Let's use a List for simplicity, pushing to head (LPUSH)
-	if err := s.client.LPush(ctx, "alerts", data).Err(); err != nil {
+	key := fmt.Sprintf("alert:%d", a.ID)
+
+	// Store alert as hash with TTL
+	pipe := s.client.Pipeline()
+	pipe.Set(ctx, key, data, alertTTL)
+
+	// Add to timeline sorted set (score = timestamp)
+	pipe.ZAdd(ctx, "alerts:timeline", redis.Z{
+		Score:  float64(a.CreatedAt.Unix()),
+		Member: key,
+	})
+
+	// Add to search indices
+	if level != "" {
+		pipe.SAdd(ctx, fmt.Sprintf("alerts:level:%s", strings.ToLower(level)), key)
+		pipe.Expire(ctx, fmt.Sprintf("alerts:level:%s", strings.ToLower(level)), alertTTL)
+	}
+	if source != "" {
+		pipe.SAdd(ctx, fmt.Sprintf("alerts:source:%s", strings.ToLower(source)), key)
+		pipe.Expire(ctx, fmt.Sprintf("alerts:source:%s", strings.ToLower(source)), alertTTL)
+	}
+
+	_, err = pipe.Exec(ctx)
+	if err != nil {
 		return models.Alert{}, err
 	}
 
 	// Publish event for SSE
 	if err := s.client.Publish(ctx, "alert_events", data).Err(); err != nil {
-		// Log error but don't fail the request?
 		fmt.Println("Failed to publish event:", err)
 	}
 
@@ -63,24 +89,125 @@ func (s *RedisStore) AddAlert(ctx context.Context, source, level, title, message
 }
 
 func (s *RedisStore) GetAlerts(ctx context.Context) ([]models.Alert, error) {
-	// Get all alerts
-	val, err := s.client.LRange(ctx, "alerts", 0, -1).Result()
+	// Get alert keys from sorted set (newest first)
+	keys, err := s.client.ZRevRange(ctx, "alerts:timeline", 0, -1).Result()
 	if err != nil {
 		return nil, err
 	}
 
 	var alerts []models.Alert
-	for _, v := range val {
+	for _, key := range keys {
+		val, err := s.client.Get(ctx, key).Result()
+		if err == redis.Nil {
+			// Alert expired, remove from sorted set
+			s.client.ZRem(ctx, "alerts:timeline", key)
+			continue
+		} else if err != nil {
+			continue
+		}
+
 		var a models.Alert
-		if err := json.Unmarshal([]byte(v), &a); err == nil {
+		if err := json.Unmarshal([]byte(val), &a); err == nil {
 			alerts = append(alerts, a)
 		}
 	}
 	return alerts, nil
 }
 
+func (s *RedisStore) SearchAlerts(ctx context.Context, query, level, source string) ([]models.Alert, error) {
+	var keys []string
+
+	// Build intersection of search criteria
+	var setKeys []string
+	if level != "" {
+		setKeys = append(setKeys, fmt.Sprintf("alerts:level:%s", strings.ToLower(level)))
+	}
+	if source != "" {
+		setKeys = append(setKeys, fmt.Sprintf("alerts:source:%s", strings.ToLower(source)))
+	}
+
+	if len(setKeys) > 0 {
+		// Intersect sets if multiple criteria
+		if len(setKeys) == 1 {
+			members, err := s.client.SMembers(ctx, setKeys[0]).Result()
+			if err != nil {
+				return nil, err
+			}
+			keys = members
+		} else {
+			members, err := s.client.SInter(ctx, setKeys...).Result()
+			if err != nil {
+				return nil, err
+			}
+			keys = members
+		}
+	} else {
+		// No filters, get all from timeline
+		allKeys, err := s.client.ZRevRange(ctx, "alerts:timeline", 0, -1).Result()
+		if err != nil {
+			return nil, err
+		}
+		keys = allKeys
+	}
+
+	// Fetch and filter by query text
+	var alerts []models.Alert
+	query = strings.ToLower(query)
+
+	for _, key := range keys {
+		val, err := s.client.Get(ctx, key).Result()
+		if err == redis.Nil {
+			continue
+		} else if err != nil {
+			continue
+		}
+
+		var a models.Alert
+		if err := json.Unmarshal([]byte(val), &a); err != nil {
+			continue
+		}
+
+		// Text search in title and message
+		if query != "" {
+			searchText := strings.ToLower(a.Title + " " + a.Message + " " + a.Source)
+			if !strings.Contains(searchText, query) {
+				continue
+			}
+		}
+
+		alerts = append(alerts, a)
+	}
+
+	return alerts, nil
+}
+
 func (s *RedisStore) ClearAlerts(ctx context.Context) error {
-	return s.client.Del(ctx, "alerts").Err()
+	// Get all keys
+	keys, err := s.client.ZRange(ctx, "alerts:timeline", 0, -1).Result()
+	if err != nil {
+		return err
+	}
+
+	// Delete all alert keys
+	if len(keys) > 0 {
+		s.client.Del(ctx, keys...)
+	}
+
+	// Clear timeline
+	s.client.Del(ctx, "alerts:timeline")
+
+	// Clear index sets (use SCAN to find them)
+	iter := s.client.Scan(ctx, 0, "alerts:level:*", 0).Iterator()
+	for iter.Next(ctx) {
+		s.client.Del(ctx, iter.Val())
+	}
+
+	iter = s.client.Scan(ctx, 0, "alerts:source:*", 0).Iterator()
+	for iter.Next(ctx) {
+		s.client.Del(ctx, iter.Val())
+	}
+
+	return nil
 }
 
 func (s *RedisStore) Subscribe(ctx context.Context) *redis.PubSub {

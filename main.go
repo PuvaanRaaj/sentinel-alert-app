@@ -58,6 +58,7 @@ func main() {
 	http.HandleFunc("/telegram/", h.TelegramHandler)
 	http.HandleFunc("/clear", h.ClearHandler)
 	http.HandleFunc("/events", h.SSEHandler)
+	http.HandleFunc("/api/search", h.SearchHandler)
 
 	// Serve static files (PWA assets)
 	fs := http.FileServer(http.Dir("web/static"))
