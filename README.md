@@ -10,7 +10,9 @@ A real-time incident alert viewer and management system built with Go, PostgreSQ
 
 ### 🚀 Real-Time Monitoring
 - **Live Alerts**: Real-time incident updates using Server-Sent Events (SSE).
+- **Push Notifications**: PWA Push Notifications for critical alerts (Mobile & Desktop).
 - **Multi-Channel Support**: Organize alerts into different chat channels.
+- **Search & Filter**: Full-text search for alerts with level/source filtering.
 - **Responsive UI**: Modern dashboard built with Tailwind CSS.
 
 ### 🔐 Security & User Management
@@ -38,13 +40,13 @@ A real-time incident alert viewer and management system built with Go, PostgreSQ
 - **Backend**: Go (Golang)
 - **Database**: PostgreSQL (Supabase compatible)
 - **Cache/PubSub**: Redis
-- **Frontend**: HTML5, Vanilla JavaScript, Tailwind CSS
+- **Frontend**: HTML5, Vanilla JavaScript, Tailwind CSS, Service Workers (PWA)
 - **Containerization**: Docker & Docker Compose
 
 ## Getting Started
 
 ### Prerequisites
-- Go 1.21+
+- Go 1.22+
 - Docker & Docker Compose
 - PostgreSQL
 - Redis
@@ -58,6 +60,12 @@ DATABASE_URL=postgres://user:password@localhost:5432/dbname?sslmode=disable
 REDIS_ADDR=localhost:6379
 REDIS_PASSWORD=
 REDIS_DB=0
+
+# Push Notifications (VAPID)
+# Keys are generated automatically on first run if not provided
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:admin@example.com
 ```
 
 ### Running with Docker Compose (Recommended)
@@ -86,6 +94,10 @@ go run main.go
 - `POST /api/user/2fa/generate` - Generate 2FA secret
 - `POST /api/user/2fa/enable` - Enable 2FA
 
+### Push Notifications
+- `GET /api/push/vapid-public-key` - Get VAPID public key
+- `POST /api/push/subscribe` - Subscribe to push notifications
+
 ### Admin API
 - `POST /api/admin/users` - Create user
 - `PUT /api/admin/users/{id}` - Update user
@@ -93,12 +105,14 @@ go run main.go
 - `POST /api/admin/purge` - Purge all alerts
 
 ### Webhooks
+- `POST /webhook` - General webhook endpoint
 - `POST /bot/{token}` - Push alert to chat
   ```json
   {
     "level": "error",
     "title": "System Down",
-    "message": "Server X is not responding"
+    "message": "Server X is not responding",
+    "source": "prometheus"
   }
   ```
 
