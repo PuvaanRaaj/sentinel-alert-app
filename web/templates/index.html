@@ -390,9 +390,9 @@
                     { id: 'vapid', method: 'GET', path: '/api/push/vapid-public-key', title: 'VAPID Key', summary: 'Fetch public VAPID key for push subscriptions.', auth: 'none', sampleUrl: '/api/push/vapid-public-key', request: `GET /api/push/vapid-public-key`, response: `"BNEay..."` },
                     { id: 'subscribe', method: 'POST', path: '/api/push/subscribe', title: 'Subscribe to Push', summary: 'Register a push subscription.', auth: 'none', sampleUrl: '/api/push/subscribe', sampleBody: { "endpoint": "https://fcm.googleapis.com/fcm/send/demo", "keys": { "p256dh": "demo", "auth": "demo" } }, request: `{\n  "endpoint": "https://fcm.googleapis.com/fcm/send/...",\n  "keys": { "p256dh": "...", "auth": "..." }\n}`, response: `{\n  "status": "ok"\n}` },
                     { id: 'webhook', method: 'POST', path: '/webhook', title: 'Generic Webhook', summary: 'Send an alert with a simple JSON payload.', auth: 'none', sampleUrl: '/webhook', sampleBody: { "title": "System Down", "message": "Server X not responding", "level": "error", "source": "pagerduty" }, request: `{\n  "title": "System Down",\n  "message": "Server X not responding",\n  "level": "error",\n  "source": "pagerduty"\n}`, response: `{\n  "status": "created",\n  "id": 42\n}` },
-                    { id: 'slack', method: 'POST', path: '/api/slack/webhook', title: 'Slack Webhook', summary: 'Slack-compatible alert payload.', auth: 'none', sampleUrl: '/api/slack/webhook', sampleBody: { "text": "Deployment failed", "attachments": [ { "title": "Error", "text": "Timeout" } ] }, request: `{\n  "text": "Deployment failed",\n  "attachments": [ { "title": "Error", "text": "Timeout" } ]\n}`, response: `{"status": "created"}` },
-                    { id: 'discord', method: 'POST', path: '/api/discord/webhook', title: 'Discord Webhook', summary: 'Discord-compatible alert payload.', auth: 'none', sampleUrl: '/api/discord/webhook', sampleBody: { "content": "Alert!", "embeds": [ { "title": "DB Down", "description": "Cannot connect" } ] }, request: `{\n  "content": "Alert!",\n  "embeds": [ { "title": "DB Down", "description": "Cannot connect" } ]\n}`, response: `{"status": "created"}` },
-                    { id: 'botwebhook', method: 'POST', path: '/bot/{token}', title: 'Bot Webhook', summary: 'Post alerts using a bot token.', auth: 'none', sampleUrl: '/bot/demo-token', sampleBody: { "title": "CPU High", "message": "95% usage", "level": "warning" }, request: `POST /bot/<token>\n{\n  "title": "CPU High",\n  "message": "95% usage",\n  "level": "warning"\n}`, response: `{"status": "created"}` },
+                    { id: 'slack', method: 'POST', path: '/api/slack/webhook', title: 'Slack Webhook', summary: 'Slack-compatible alert payload.', auth: 'none', sampleUrl: '/api/slack/webhook', sampleBody: { "text": "Deployment failed", "attachments": [ { "title": "Error", "text": "Timeout" } ] }, request: `{\n  "text": "Deployment failed",\n  "attachments": [ { "title": "Error", "text": "Timeout" } ]\n}`, response: `{"status": "created"}`, hmac: true },
+                    { id: 'discord', method: 'POST', path: '/api/discord/webhook', title: 'Discord Webhook', summary: 'Discord-compatible alert payload.', auth: 'none', sampleUrl: '/api/discord/webhook', sampleBody: { "content": "Alert!", "embeds": [ { "title": "DB Down", "description": "Cannot connect" } ] }, request: `{\n  "content": "Alert!",\n  "embeds": [ { "title": "DB Down", "description": "Cannot connect" } ]\n}`, response: `{"status": "created"}`, hmac: true },
+                    { id: 'botwebhook', method: 'POST', path: '/bot/{token}', title: 'Bot Webhook', summary: 'Post alerts using a bot token.', auth: 'none', sampleUrl: '/bot/demo-token', sampleBody: { "title": "CPU High", "message": "95% usage", "level": "warning" }, request: `POST /bot/<token>\n{\n  "title": "CPU High",\n  "message": "95% usage",\n  "level": "warning"\n}`, response: `{"status": "created"}`, hmac: true },
                 ]
             },
             {
@@ -549,6 +549,22 @@
                         </div>
                     </div>
                 </div>
+                ${endpoint.hmac ? `
+                <div class="card-ghost rounded-2xl p-4 mb-4 border border-blue-900/40 bg-blue-950/30">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="px-2 py-1 rounded-full text-[11px] bg-blue-800 text-blue-100 border border-blue-600/50">HMAC required</span>
+                        <span class="text-xs text-slate-400">Header: X-Sentinel-Signature = hex(HMAC-SHA256(body, secret))</span>
+                    </div>
+                    <pre class="code-block text-xs">body='{"title":"Hello","message":"World"}'
+secret='YOUR_SECRET'
+sig=$(printf "%s" "$body" | openssl dgst -sha256 -hmac "$secret" -binary | xxd -p -c 256)
+curl -X ${endpoint.method} "${endpoint.sampleUrl || endpoint.path}" \\
+  -H "Content-Type: application/json" \\
+  -H "X-Sentinel-Signature: $sig" \\
+  -d "$body"</pre>
+                    <p class="text-[11px] text-slate-400 mt-2">If enforcing timestamp/nonce, include headers like <code>X-Sentinel-Timestamp</code> and <code>X-Sentinel-Nonce</code> and sign <code>timestamp + '.' + nonce + '.' + body</code>.</p>
+                </div>
+                ` : ''}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="card-ghost rounded-2xl p-4">
                         <div class="flex items-center justify-between mb-2">

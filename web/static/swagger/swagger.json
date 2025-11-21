@@ -1,10 +1,10 @@
 {
-  "openapi": "3.0.1",
-  "info": {
-    "title": "Sentinel Incident Viewer API",
-    "description": "Interactive API guide for Sentinel. Public endpoints are open; internal endpoints require an authenticated session (developer/admin).",
-    "version": "1.0.0"
-  },
+    "openapi": "3.0.1",
+    "info": {
+        "title": "Sentinel Incident Viewer API",
+        "description": "Interactive API guide for Sentinel. Public endpoints are open; internal endpoints require an authenticated session (developer/admin).\\n\\n### Webhook HMAC\\nFor webhook endpoints (generic/Slack/Discord/bot), include `X-Sentinel-Signature` computed as hex(HMAC-SHA256(body, secret)). Example in bash:\\n```bash\\nbody='{\"title\":\"Hello\",\"message\":\"World\"}'\\nsecret='YOUR_SECRET'\\nsig=$(printf \"%s\" \"$body\" | openssl dgst -sha256 -hmac \"$secret\" -binary | xxd -p -c 256)\\ncurl -X POST https://your-host/webhook \\\\\\n  -H \"X-Sentinel-Signature: $sig\" \\\\\\n  -H \"Content-Type: application/json\" \\\\\\n  -d \"$body\"\\n```\\nYou can also include a timestamp/nonce if you enforce it (e.g., add headers `X-Sentinel-Timestamp` and `X-Sentinel-Nonce` and sign `timestamp + '.' + nonce + '.' + body`).",
+        "version": "1.0.0"
+    },
   "servers": [
     {
       "url": "/",

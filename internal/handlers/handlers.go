@@ -103,6 +103,11 @@ func (h *Handler) WebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !validateSharedSecret(r) {
+		http.Error(w, "invalid signature", http.StatusUnauthorized)
+		return
+	}
+
 	// Try JSON first
 	var payload map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -299,6 +304,11 @@ func (h *Handler) SlackWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !validateSharedSecret(r) {
+		http.Error(w, "invalid signature", http.StatusUnauthorized)
+		return
+	}
+
 	var payload struct {
 		Text        string `json:"text"`
 		Attachments []struct {
@@ -353,6 +363,11 @@ func (h *Handler) SlackWebhookHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DiscordWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !validateSharedSecret(r) {
+		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
 	}
 

@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"incident-viewer-go/internal/models"
 )
 
 // === User Management ===
@@ -330,6 +328,11 @@ func (h *Handler) BotWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !validateSharedSecret(r) {
+		http.Error(w, "invalid signature", http.StatusUnauthorized)
+		return
+	}
+
 	// Extract token from path: /bot/{token}/sendMessage
 	path := r.URL.Path
 
@@ -358,20 +361,44 @@ func (h *Handler) BotWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse message (Telegram-like format)
-	var req struct {
-		ChatID string `json:"chat_id"`
-		Text   string `json:"text"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Parse message (defaults + flexible fields)
+	var payload map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
+	chatID := getString(payload["chat_id"])
+	if chatID == "" {
+		http.Error(w, "chat_id required", http.StatusBadRequest)
+		return
+	}
+
+	title := getString(payload["title"])
+	if title == "" {
+		title = "Bot Message"
+	}
+
+	msg := getString(payload["message"])
+	if msg == "" {
+		msg = getString(payload["text"])
+	}
+	if msg == "" {
+		msg = getString(payload["description"])
+	}
+	if msg == "" {
+		buf, _ := json.Marshal(payload)
+		msg = string(buf)
+	}
+
+	level := strings.ToLower(getString(payload["level"]))
+	if level == "" {
+		level = "info"
+	}
+
 	// Create alert with chat_id in source for filtering
-	source := fmt.Sprintf("bot:%s:chat:%s", bot.Name, req.ChatID)
-	alert, err := h.AlertStore.AddAlert(r.Context(), source, "info", "Bot Message", req.Text)
+	source := fmt.Sprintf("bot:%s:chat:%s", bot.Name, chatID)
+	alert, err := h.AlertStore.AddAlert(r.Context(), source, level, title, msg)
 	if err != nil {
 		log.Println("AddAlert error:", err)
 		http.Error(w, "Failed to create alert", http.StatusInternalServerError)
