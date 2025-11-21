@@ -19,8 +19,41 @@ func (h *Handler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type chatView struct {
+		ID     int    `json:"id"`
+		ChatID string `json:"chat_id"`
+		Name   string `json:"name"`
+		BotID  int    `json:"bot_id"`
+	}
+
+	respUsers := make([]map[string]any, 0, len(users))
+	for _, u := range users {
+		chats := []chatView{}
+		if u.Role != "admin" && u.Role != "developer" {
+			if assigned, err := h.AdminStore.GetUserChats(r.Context(), u.ID); err == nil {
+				for _, c := range assigned {
+					chats = append(chats, chatView{
+						ID:     c.ID,
+						ChatID: c.ChatID,
+						Name:   c.Name,
+						BotID:  c.BotID,
+					})
+				}
+			}
+		}
+		respUsers = append(respUsers, map[string]any{
+			"id":            u.ID,
+			"username":      u.Username,
+			"role":          u.Role,
+			"totp_enabled":  u.TOTPEnabled,
+			"chats":         chats,
+			"created_at":    u.CreatedAt,
+			"last_password": u.LastPasswordChange,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"users": users})
+	json.NewEncoder(w).Encode(map[string]any{"users": respUsers})
 }
 
 func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
