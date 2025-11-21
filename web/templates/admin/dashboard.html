@@ -134,10 +134,19 @@
             container.innerHTML = users.map(u => `
                 <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex items-center justify-between">
                     <div>
-                        <h3 class="font-semibold">${u.username}</h3>
+                        <div class="flex items-center space-x-2">
+                            <h3 class="font-semibold">${u.username}</h3>
+                            ${u.totp_enabled ? 
+                                '<span class="px-2 py-0.5 bg-green-500/10 text-green-400 text-xs rounded border border-green-500/20">2FA Enabled</span>' : 
+                                '<span class="px-2 py-0.5 bg-slate-500/10 text-slate-400 text-xs rounded border border-slate-500/20">2FA Disabled</span>'
+                            }
+                        </div>
                         <p class="text-sm text-slate-400">Role: ${u.role} | ID: ${u.id}</p>
                     </div>
-                   <button onclick="deleteUser(${u.id})" class="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm">Delete</button>
+                    <div class="flex space-x-2">
+                        <button onclick="showEditUser(${u.id})" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm">Edit</button>
+                        <button onclick="deleteUser(${u.id})" class="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm">Delete</button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -284,6 +293,82 @@
             };
             
             lucide.createIcons();
+        }
+
+        function showEditUser(userId) {
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+
+            showModal(`Edit User: ${user.username}`, `
+                <div class="space-y-6">
+                    <!-- Reset Password -->
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <h4 class="font-semibold mb-3">Reset Password</h4>
+                        <form onsubmit="resetPassword(event, ${user.id})" class="space-y-3">
+                            <input type="password" id="new-password-${user.id}" placeholder="New Password" required 
+                                class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm" />
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded text-sm">Update Password</button>
+                        </form>
+                    </div>
+
+                    <!-- 2FA Management -->
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <h4 class="font-semibold mb-3">Two-Factor Authentication</h4>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-400">Status: ${user.totp_enabled ? 'Enabled' : 'Disabled'}</span>
+                            ${user.totp_enabled ? `
+                                <button onclick="disableUser2FA(${user.id})" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded text-sm">Disable 2FA</button>
+                            ` : '<span class="text-xs text-slate-500">User must enable 2FA themselves</span>'}
+                        </div>
+                    </div>
+
+                    <button onclick="hideModal()" class="w-full bg-slate-700 hover:bg-slate-600 py-2 rounded">Close</button>
+                </div>
+            `);
+        }
+
+        async function resetPassword(e, userId) {
+            e.preventDefault();
+            const password = document.getElementById(`new-password-${userId}`).value;
+            
+            try {
+                const res = await fetch('/api/admin/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, new_password: password })
+                });
+                
+                if (res.ok) {
+                    alert('Password updated successfully');
+                    document.getElementById(`new-password-${userId}`).value = '';
+                } else {
+                    alert('Failed to update password');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function disableUser2FA(userId) {
+            if (!confirm('Are you sure you want to disable 2FA for this user?')) return;
+            
+            try {
+                const res = await fetch('/api/admin/disable-2fa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+                
+                if (res.ok) {
+                    alert('2FA disabled successfully');
+                    hideModal();
+                    loadUsers();
+                } else {
+                    alert('Failed to disable 2FA');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
         }
 
         function showCreateBot() {

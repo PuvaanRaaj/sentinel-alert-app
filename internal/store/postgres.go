@@ -32,10 +32,29 @@ func NewPostgresStore(databaseURL string) (*PostgresStore, error) {
 	return &PostgresStore{db: db}, nil
 }
 
-// RunMigrations creates tables if they don't exist
+// RunMigrations creates tables if they don't exist and applies schema updates
 func (s *PostgresStore) RunMigrations(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, schemaSQL)
-	return err
+	// Create tables
+	if _, err := s.db.ExecContext(ctx, schemaSQL); err != nil {
+		return err
+	}
+
+	// Apply migrations for existing tables
+	migrations := []string{
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(255);`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT FALSE;`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_password_change TIMESTAMP WITH TIME ZONE DEFAULT NOW();`,
+	}
+
+	for _, migration := range migrations {
+		if _, err := s.db.ExecContext(ctx, migration); err != nil {
+			// Log error but continue? Or fail?
+			// For now, let's return error if migration fails, as it's critical.
+			return fmt.Errorf("migration failed: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // User methods
@@ -63,28 +82,56 @@ func (s *PostgresStore) CreateUser(ctx context.Context, username, password, role
 
 func (s *PostgresStore) GetUser(ctx context.Context, id int) (models.User, error) {
 	var user models.User
+	var totpSecret sql.NullString
+	var lastPasswordChange sql.NullTime
+
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id, username, password_hash, role, totp_secret, totp_enabled, last_password_change, created_at FROM users WHERE id = $1`,
 		id,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.TOTPSecret, &user.TOTPEnabled, &user.LastPasswordChange, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &totpSecret, &user.TOTPEnabled, &lastPasswordChange, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return models.User{}, errors.New("user not found")
 	}
-	return user, err
+	if err != nil {
+		return models.User{}, err
+	}
+
+	if totpSecret.Valid {
+		user.TOTPSecret = totpSecret.String
+	}
+	if lastPasswordChange.Valid {
+		user.LastPasswordChange = lastPasswordChange.Time
+	}
+
+	return user, nil
 }
 
 func (s *PostgresStore) GetUserByUsername(ctx context.Context, username string) (models.User, error) {
 	var user models.User
+	var totpSecret sql.NullString
+	var lastPasswordChange sql.NullTime
+
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id, username, password_hash, role, totp_secret, totp_enabled, last_password_change, created_at FROM users WHERE username = $1`,
 		username,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.TOTPSecret, &user.TOTPEnabled, &user.LastPasswordChange, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &totpSecret, &user.TOTPEnabled, &lastPasswordChange, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return models.User{}, errors.New("user not found")
 	}
-	return user, err
+	if err != nil {
+		return models.User{}, err
+	}
+
+	if totpSecret.Valid {
+		user.TOTPSecret = totpSecret.String
+	}
+	if lastPasswordChange.Valid {
+		user.LastPasswordChange = lastPasswordChange.Time
+	}
+
+	return user, nil
 }
 
 func (s *PostgresStore) GetUsers(ctx context.Context) ([]models.User, error) {
@@ -99,9 +146,20 @@ func (s *PostgresStore) GetUsers(ctx context.Context) ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.TOTPSecret, &user.TOTPEnabled, &user.LastPasswordChange, &user.CreatedAt); err != nil {
+		var totpSecret sql.NullString
+		var lastPasswordChange sql.NullTime
+
+		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &totpSecret, &user.TOTPEnabled, &lastPasswordChange, &user.CreatedAt); err != nil {
 			continue
 		}
+
+		if totpSecret.Valid {
+			user.TOTPSecret = totpSecret.String
+		}
+		if lastPasswordChange.Valid {
+			user.LastPasswordChange = lastPasswordChange.Time
+		}
+
 		users = append(users, user)
 	}
 

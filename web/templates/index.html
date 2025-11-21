@@ -33,7 +33,9 @@
                 </button>
             </div>
             <p class="text-slate-400 mb-6">Please login to access custom chat channels</p>
-            <form onsubmit="login(event)" class="space-y-4">
+            
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="login(event)" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Username</label>
                     <input type="text" id="login-username" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter username" />
@@ -46,7 +48,133 @@
                     Login
                 </button>
             </form>
+
+            <!-- 2FA Verification Form (Hidden initially) -->
+            <form id="login-2fa-form" onsubmit="verifyLogin2FA(event)" class="hidden space-y-4">
+                <div class="text-center mb-4">
+                    <div class="bg-blue-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <i data-lucide="shield-check" class="w-8 h-8 text-blue-500"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">Two-Factor Authentication</h3>
+                    <p class="text-sm text-slate-400">Enter the 6-digit code from your authenticator app</p>
+                </div>
+                <div>
+                    <input type="text" id="login-2fa-code" maxlength="6" pattern="[0-9]{6}" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-center text-2xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="000000" />
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-semibold transition-all">
+                    Verify
+                </button>
+                <button type="button" onclick="cancel2FALogin()" class="w-full text-slate-400 hover:text-white text-sm">
+                    Back to Login
+                </button>
+            </form>
+
             <div id="login-error" class="hidden mt-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm"></div>
+        </div>
+    </div>
+
+    <!-- User Profile Modal -->
+    <div id="profile-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4 border border-slate-700">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold flex items-center">
+                    <i data-lucide="user" class="w-6 h-6 mr-2 text-blue-500"></i>
+                    User Profile
+                </h2>
+                <button onclick="hideProfileModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-6">
+                <!-- Profile Info -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Username</label>
+                        <div class="flex space-x-2">
+                            <input type="text" id="profile-username" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
+                            <button onclick="updateUsername()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-xs font-bold">Update</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Role</label>
+                        <div id="profile-role" class="text-slate-300 font-mono bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-800"></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-slate-700"></div>
+
+                <!-- Security Settings -->
+                <div>
+                    <h3 class="text-sm font-bold text-white mb-3">Security</h3>
+                    <div class="space-y-3">
+                        <button onclick="showChangePasswordModal()" class="w-full flex items-center justify-between bg-slate-700/50 hover:bg-slate-700 p-3 rounded-lg border border-slate-600/50 transition-all">
+                            <div class="flex items-center space-x-3">
+                                <i data-lucide="key" class="w-4 h-4 text-slate-400"></i>
+                                <span class="text-sm">Change Password</span>
+                            </div>
+                            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+                        </button>
+                        
+                        <div class="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600/50">
+                            <div class="flex items-center space-x-3">
+                                <i data-lucide="shield" class="w-4 h-4 text-slate-400"></i>
+                                <div>
+                                    <div class="text-sm font-medium">Two-Factor Auth</div>
+                                    <div id="profile-2fa-status" class="text-xs text-slate-500">Disabled</div>
+                                </div>
+                            </div>
+                            <button id="btn-toggle-2fa" onclick="toggle2FA()" class="text-xs font-bold px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white">
+                                Setup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="profile-message" class="hidden mt-4 p-3 rounded-lg text-sm text-center"></div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="password-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center">
+        <div class="bg-slate-800 p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 border border-slate-700">
+            <h3 class="text-lg font-bold mb-4">Change Password</h3>
+            <form onsubmit="changePassword(event)" class="space-y-3">
+                <input type="password" id="pwd-old" placeholder="Current Password" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
+                <input type="password" id="pwd-new" placeholder="New Password (min 8 chars)" required minlength="8" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
+                <input type="password" id="pwd-confirm" placeholder="Confirm New Password" required minlength="8" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
+                <div class="flex space-x-2 pt-2">
+                    <button type="button" onclick="hideChangePasswordModal()" class="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-sm">Cancel</button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm font-bold">Save</button>
+                </div>
+            </form>
+            <div id="pwd-error" class="hidden mt-3 text-red-400 text-xs text-center"></div>
+        </div>
+    </div>
+
+    <!-- 2FA Setup Modal -->
+    <div id="2fa-setup-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center">
+        <div class="bg-slate-800 p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 border border-slate-700">
+            <h3 class="text-lg font-bold mb-2">Setup 2FA</h3>
+            <p class="text-xs text-slate-400 mb-4">Scan this QR code with Google Authenticator or Authy</p>
+            
+            <div class="bg-white p-2 rounded-lg w-fit mx-auto mb-4">
+                <img id="2fa-qr-code" src="" alt="QR Code" class="w-48 h-48" />
+            </div>
+            
+            <div class="mb-4 text-center">
+                <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Secret Key</p>
+                <code id="2fa-secret" class="bg-slate-900 px-2 py-1 rounded text-xs font-mono text-blue-400 select-all"></code>
+            </div>
+
+            <form onsubmit="enable2FA(event)" class="space-y-3">
+                <input type="text" id="2fa-verify-code" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]{6}" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-center text-lg tracking-widest font-mono" />
+                <div class="flex space-x-2">
+                    <button type="button" onclick="hide2FASetupModal()" class="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-sm">Cancel</button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-sm font-bold">Enable</button>
+                </div>
+            </form>
+            <div id="2fa-error" class="hidden mt-3 text-red-400 text-xs text-center"></div>
         </div>
     </div>
 
@@ -184,17 +312,52 @@
         // --- Authentication State ---
         let isAuthenticated = false;
         let currentUser = null;
+        let tempUserId = null; // For 2FA login flow
 
         // Check session on load
         function checkAuth() {
             const userId = localStorage.getItem('userId');
             const username = localStorage.getItem('username');
+            const totpEnabled = localStorage.getItem('totpEnabled') === 'true';
+            
             if (userId && username) {
                 isAuthenticated = true;
-                currentUser = { id: parseInt(userId), username };
-                document.getElementById('user-profile').classList.remove('hidden');
-                document.getElementById('user-name').textContent = username;
+                currentUser = { 
+                    id: parseInt(userId), 
+                    username,
+                    totp_enabled: totpEnabled
+                };
+                updateProfileUI();
                 lucide.createIcons();
+            }
+        }
+
+        function updateProfileUI() {
+            if (isAuthenticated && currentUser) {
+                document.getElementById('user-profile').classList.remove('hidden');
+                document.getElementById('user-name').textContent = currentUser.username;
+                // Update profile modal fields
+                document.getElementById('profile-username').value = currentUser.username;
+                document.getElementById('profile-role').textContent = localStorage.getItem('userRole') || 'User';
+                
+                const statusEl = document.getElementById('profile-2fa-status');
+                const btnEl = document.getElementById('btn-toggle-2fa');
+                
+                if (currentUser.totp_enabled) {
+                    statusEl.textContent = 'Enabled ✅';
+                    statusEl.className = 'text-xs text-emerald-400 font-bold';
+                    btnEl.textContent = 'Disable';
+                    btnEl.className = 'text-xs font-bold px-3 py-1.5 rounded bg-red-600 hover:bg-red-500 text-white';
+                    btnEl.onclick = disable2FA;
+                } else {
+                    statusEl.textContent = 'Disabled';
+                    statusEl.className = 'text-xs text-slate-500';
+                    btnEl.textContent = 'Setup';
+                    btnEl.className = 'text-xs font-bold px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white';
+                    btnEl.onclick = show2FASetupModal;
+                }
+            } else {
+                document.getElementById('user-profile').classList.add('hidden');
             }
         }
 
@@ -202,6 +365,8 @@
         
         function showLoginOverlay() {
             document.getElementById('login-overlay').classList.remove('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('login-2fa-form').classList.add('hidden');
             document.getElementById('login-error').classList.add('hidden');
             lucide.createIcons();
         }
@@ -210,7 +375,9 @@
             document.getElementById('login-overlay').classList.add('hidden');
             document.getElementById('login-username').value = '';
             document.getElementById('login-password').value = '';
+            document.getElementById('login-2fa-code').value = '';
             document.getElementById('login-error').classList.add('hidden');
+            tempUserId = null;
         }
 
         async function login(e) {
@@ -225,67 +392,303 @@
                     body: JSON.stringify({ username, password })
                 });
                 
+                const data = await res.json();
+                
                 if (res.ok) {
-                    // Store session
-                    const data = await res.json();
-                    if (data.user) {
-                        localStorage.setItem('userId', data.user.id);
-                        localStorage.setItem('username', data.user.username);
-                        localStorage.setItem('userRole', data.user.role);
-                        
-                        // Store allowed chats for filtering
-                        if (data.allowed_chats) {
-                            localStorage.setItem('allowedChats', JSON.stringify(data.allowed_chats));
-                        }
-                        
-                        isAuthenticated = true;
-                        currentUser = data.user;
-                        
-                        // Update UI
-                        document.getElementById('user-profile').classList.remove('hidden');
-                        document.getElementById('user-name').textContent = data.user.username;
-                        hideLoginOverlay();
-                        
-                        // Reload chats with permissions
-                        await loadChats();
-                        renderChannels(); // Refresh to remove locks
-                        lucide.createIcons();
+                    if (data.requires_2fa) {
+                        // Switch to 2FA form
+                        tempUserId = data.user_id;
+                        document.getElementById('login-form').classList.add('hidden');
+                        document.getElementById('login-2fa-form').classList.remove('hidden');
+                        document.getElementById('login-error').classList.add('hidden');
+                        document.getElementById('login-2fa-code').focus();
+                    } else {
+                        handleLoginSuccess(data);
                     }
                 } else {
-                    const errorDiv = document.getElementById('login-error');
-                    errorDiv.textContent = 'Invalid username or password';
-                    errorDiv.classList.remove('hidden');
+                    showLoginError(data.error || 'Invalid credentials');
                 }
             } catch (err) {
                 console.error('Login error:', err);
-                const errorDiv = document.getElementById('login-error');
-                errorDiv.textContent = 'Error: ' + err.message;
-                errorDiv.classList.remove('hidden');
+                showLoginError('Error: ' + err.message);
             }
+        }
+
+        async function verifyLogin2FA(e) {
+            e.preventDefault();
+            const code = document.getElementById('login-2fa-code').value;
+            
+            try {
+                const res = await fetch('/api/login/verify-2fa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: tempUserId, code })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    handleLoginSuccess(data);
+                } else {
+                    showLoginError('Invalid verification code');
+                }
+            } catch (err) {
+                showLoginError('Error: ' + err.message);
+            }
+        }
+
+        function cancel2FALogin() {
+            document.getElementById('login-2fa-form').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('login-error').classList.add('hidden');
+            tempUserId = null;
+        }
+
+        function handleLoginSuccess(data) {
+            if (data.user) {
+                localStorage.setItem('userId', data.user.id);
+                localStorage.setItem('username', data.user.username);
+                localStorage.setItem('userRole', data.user.role);
+                localStorage.setItem('totpEnabled', data.user.totp_enabled || false); // Store 2FA status
+                
+                if (data.allowed_chats) {
+                    localStorage.setItem('allowedChats', JSON.stringify(data.allowed_chats));
+                }
+                
+                isAuthenticated = true;
+                currentUser = { 
+                    ...data.user,
+                    totp_enabled: data.user.totp_enabled || false
+                };
+                
+                updateProfileUI();
+                hideLoginOverlay();
+                
+                loadChats();
+                renderChannels();
+                lucide.createIcons();
+            }
+        }
+
+        function showLoginError(msg) {
+            const errorDiv = document.getElementById('login-error');
+            errorDiv.textContent = msg;
+            errorDiv.classList.remove('hidden');
         }
 
         function logout() {
             if (confirm('Are you sure you want to logout?')) {
-                // Clear session
-                localStorage.removeItem('userId');
-                localStorage.removeItem('username');
-                localStorage.removeItem('userRole');
-                localStorage.removeItem('allowedChats');
+                localStorage.clear(); // Clear all
                 isAuthenticated = false;
                 currentUser = null;
                 
-                // Update UI
-                document.getElementById('user-profile').classList.add('hidden');
+                updateProfileUI();
                 
-                // Reset channels to general only
+                // Reset channels
                 channels = [{ id: 'general', name: 'General', icon: 'hash' }];
-                
-                // Switch to general if on a protected channel
                 if (currentChannelId !== 'general' && currentChannelId !== 'integration') {
                     switchChannel('general');
                 } else {
-                    renderChannels(); // Refresh to show locks
+                    renderChannels();
                 }
+            }
+        }
+
+        // --- Profile Management ---
+
+        // Add click handler to user profile button
+        document.getElementById('user-profile').onclick = function(e) {
+            // Only if clicking the name or container, not the logout button
+            if (!e.target.closest('button')) {
+                showProfileModal();
+            }
+        };
+
+        // Also add a dedicated profile button next to logout
+        // (Injecting this via JS to avoid modifying HTML structure too much if not needed)
+        // Actually, let's just make the name clickable
+        document.getElementById('user-name').className = "text-sm text-slate-400 hover:text-white cursor-pointer font-medium mr-2";
+        document.getElementById('user-name').onclick = showProfileModal;
+
+        function showProfileModal() {
+            updateProfileUI(); // Refresh data
+            document.getElementById('profile-modal').classList.remove('hidden');
+            document.getElementById('profile-message').classList.add('hidden');
+        }
+
+        function hideProfileModal() {
+            document.getElementById('profile-modal').classList.add('hidden');
+        }
+
+        async function updateUsername() {
+            const newUsername = document.getElementById('profile-username').value;
+            if (!newUsername) return;
+
+            try {
+                const res = await fetch('/api/user/profile', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser.id, username: newUsername })
+                });
+
+                if (res.ok) {
+                    currentUser.username = newUsername;
+                    localStorage.setItem('username', newUsername);
+                    updateProfileUI();
+                    showProfileMessage('Username updated successfully', 'text-emerald-400');
+                } else {
+                    showProfileMessage('Failed to update username', 'text-red-400');
+                }
+            } catch (err) {
+                showProfileMessage('Error: ' + err.message, 'text-red-400');
+            }
+        }
+
+        function showProfileMessage(msg, colorClass) {
+            const el = document.getElementById('profile-message');
+            el.textContent = msg;
+            el.className = `mt-4 p-3 rounded-lg text-sm text-center bg-slate-900 ${colorClass}`;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3000);
+        }
+
+        // --- Password Management ---
+
+        function showChangePasswordModal() {
+            hideProfileModal();
+            document.getElementById('password-modal').classList.remove('hidden');
+            document.getElementById('pwd-old').value = '';
+            document.getElementById('pwd-new').value = '';
+            document.getElementById('pwd-confirm').value = '';
+            document.getElementById('pwd-error').classList.add('hidden');
+        }
+
+        function hideChangePasswordModal() {
+            document.getElementById('password-modal').classList.add('hidden');
+            showProfileModal(); // Go back to profile
+        }
+
+        async function changePassword(e) {
+            e.preventDefault();
+            const oldPwd = document.getElementById('pwd-old').value;
+            const newPwd = document.getElementById('pwd-new').value;
+            const confirmPwd = document.getElementById('pwd-confirm').value;
+
+            if (newPwd !== confirmPwd) {
+                document.getElementById('pwd-error').textContent = "New passwords do not match";
+                document.getElementById('pwd-error').classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/user/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        user_id: currentUser.id, 
+                        old_password: oldPwd,
+                        new_password: newPwd 
+                    })
+                });
+
+                if (res.ok) {
+                    alert('Password changed successfully');
+                    hideChangePasswordModal();
+                } else {
+                    const data = await res.json();
+                    document.getElementById('pwd-error').textContent = data.error || "Failed to change password";
+                    document.getElementById('pwd-error').classList.remove('hidden');
+                }
+            } catch (err) {
+                document.getElementById('pwd-error').textContent = "Error: " + err.message;
+                document.getElementById('pwd-error').classList.remove('hidden');
+            }
+        }
+
+        // --- 2FA Management ---
+
+        async function show2FASetupModal() {
+            hideProfileModal();
+            document.getElementById('2fa-setup-modal').classList.remove('hidden');
+            document.getElementById('2fa-error').classList.add('hidden');
+            document.getElementById('2fa-verify-code').value = '';
+
+            // Fetch new secret
+            try {
+                const res = await fetch('/api/user/2fa/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser.id })
+                });
+                
+                const data = await res.json();
+                document.getElementById('2fa-qr-code').src = data.qr_code;
+                document.getElementById('2fa-secret').textContent = data.secret;
+                
+                // Store secret temporarily for verification
+                currentUser.tempSecret = data.secret;
+            } catch (err) {
+                console.error('Failed to generate 2FA', err);
+                alert('Failed to generate 2FA secret');
+                hide2FASetupModal();
+            }
+        }
+
+        function hide2FASetupModal() {
+            document.getElementById('2fa-setup-modal').classList.add('hidden');
+            showProfileModal();
+        }
+
+        async function enable2FA(e) {
+            e.preventDefault();
+            const code = document.getElementById('2fa-verify-code').value;
+            
+            try {
+                const res = await fetch('/api/user/2fa/enable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        user_id: currentUser.id, 
+                        secret: currentUser.tempSecret,
+                        code: code 
+                    })
+                });
+
+                if (res.ok) {
+                    currentUser.totp_enabled = true;
+                    localStorage.setItem('totpEnabled', 'true');
+                    alert('Two-Factor Authentication Enabled! 🎉');
+                    hide2FASetupModal();
+                } else {
+                    document.getElementById('2fa-error').textContent = "Invalid code. Please try again.";
+                    document.getElementById('2fa-error').classList.remove('hidden');
+                }
+            } catch (err) {
+                document.getElementById('2fa-error').textContent = "Error: " + err.message;
+                document.getElementById('2fa-error').classList.remove('hidden');
+            }
+        }
+
+        async function disable2FA() {
+            if (!confirm('Are you sure you want to disable 2FA? This will reduce your account security.')) return;
+
+            try {
+                const res = await fetch('/api/user/2fa/disable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser.id })
+                });
+
+                if (res.ok) {
+                    currentUser.totp_enabled = false;
+                    localStorage.setItem('totpEnabled', 'false');
+                    updateProfileUI();
+                    showProfileMessage('2FA Disabled', 'text-amber-400');
+                } else {
+                    alert('Failed to disable 2FA');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
             }
         }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"incident-viewer-go/internal/models"
 	"log"
 	"net/http"
 
@@ -45,6 +46,17 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if 2FA is enabled
+	if user.TOTPEnabled {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"success":      true,
+			"requires_2fa": true,
+			"user_id":      user.ID,
+		})
+		return
+	}
+
 	// Create session
 	session, _ := sessionStore.Get(r, sessionName)
 	session.Values["user_id"] = user.ID
@@ -56,6 +68,50 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"success":  true,
 		"user":     user,
+		"redirect": "/admin/dashboard",
+	})
+}
+
+// VerifyAdmin2FAHandler verifies 2FA code for admin login
+func (h *Handler) VerifyAdmin2FAHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		UserID int    `json:"user_id"`
+		Code   string `json:"code"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Get user
+	user, err := h.AdminStore.GetUser(r.Context(), req.UserID)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Verify code
+	if !models.VerifyTOTPCode(user.TOTPSecret, req.Code) {
+		http.Error(w, "Invalid verification code", http.StatusUnauthorized)
+		return
+	}
+
+	// Create session
+	session, _ := sessionStore.Get(r, sessionName)
+	session.Values["user_id"] = user.ID
+	session.Values["username"] = user.Username
+	session.Values["role"] = user.Role
+	session.Save(r, w)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"success":  true,
 		"redirect": "/admin/dashboard",
 	})
 }

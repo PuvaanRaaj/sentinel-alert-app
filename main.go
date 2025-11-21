@@ -49,18 +49,23 @@ func main() {
 		log.Fatal("DATABASE_URL environment variable is required")
 	}
 
-	// Initialize PostgreSQL store (for admin data)
-	pgStore, err := store.NewPostgresStore(databaseURL)
+	// Initialize Admin store (PostgreSQL)
+	adminStore, err := store.NewPostgresStore(databaseURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+		log.Fatal("Failed to connect to database:", err)
 	}
 
 	// Run database migrations
 	ctx := context.Background()
-	if err := pgStore.RunMigrations(ctx); err != nil {
+	if err := adminStore.RunMigrations(ctx); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 	log.Println("Database migrations completed")
+
+	// Seed admin user
+	if err := seedAdmin(ctx, adminStore); err != nil {
+		log.Printf("Failed to seed admin user: %v", err)
+	}
 
 	// Parse templates
 	tmplPath := filepath.Join("web", "templates", "index.html")
@@ -85,7 +90,7 @@ func main() {
 	}
 
 	// Initialize handlers with both stores
-	h := handlers.NewHandler(redisStore, pgStore, tmpl, adminTmpl)
+	h := handlers.NewHandler(redisStore, adminStore, tmpl, adminTmpl)
 
 	// Initialize default admin user
 	h.InitSession(ctx)
@@ -108,6 +113,7 @@ func main() {
 			h.LoginHandler(w, r)
 		}
 	})
+	http.HandleFunc("/admin/verify-2fa", h.VerifyAdmin2FAHandler)
 	http.HandleFunc("/admin/logout", h.LogoutHandler)
 	http.HandleFunc("/admin/dashboard", handlers.AuthMiddleware(handlers.AdminMiddleware(h.AdminDashboardPage)))
 
@@ -205,4 +211,21 @@ func main() {
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// seedAdmin creates a default admin user if one doesn't exist
+func seedAdmin(ctx context.Context, s store.AdminStore) error {
+	// Check if admin exists
+	_, err := s.GetUserByUsername(ctx, "admin")
+	if err == nil {
+		return nil // Admin already exists
+	}
+
+	log.Println("Seeding default admin user...")
+	_, err = s.CreateUser(ctx, "admin", "admin123", "admin")
+	if err != nil {
+		return err
+	}
+	log.Println("Default admin user created: admin / admin123")
+	return nil
 }
