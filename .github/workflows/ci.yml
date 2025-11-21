@@ -30,6 +30,11 @@ jobs:
       - name: Download modules
         run: go mod download
 
+      - name: Staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          "$GOPATH/bin/staticcheck" ./...
+
       - name: Run tests
         run: go test ./...
 
@@ -43,12 +48,26 @@ jobs:
     env:
       IMAGE_NAME: ghcr.io/${{ github.repository }}
       DOCKERFILE: Dockerfile
+      PLATFORMS: linux/amd64,linux/arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+          flavor: |
+            latest=false
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -65,8 +84,9 @@ jobs:
           context: .
           file: ${{ env.DOCKERFILE }}
           push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          platforms: ${{ env.PLATFORMS }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           provenance: false
 
       - name: Tag main as latest
