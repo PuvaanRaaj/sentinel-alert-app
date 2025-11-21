@@ -2,9 +2,13 @@
 
 A real-time incident alert viewer and management system built with Go, PostgreSQL, and Redis.
 
-![alt text](dashboard.png)
+A real-time incident alert viewer and management system built with Go, PostgreSQL, and Redis.
 
+## Screenshots
 
+| Dashboard | User Profile | Mobile View |
+|:---:|:---:|:---:|
+| ![Dashboard](screenshots/dashboard.png) | ![User Profile](screenshots/user_profile.png) | ![Mobile View](screenshots/mobile_view.png) |
 
 ## Features
 
