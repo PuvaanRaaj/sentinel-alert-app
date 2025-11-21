@@ -185,7 +185,10 @@
                 }
             });
 
-            if (tab === 'users') loadUsers();
+            if (tab === 'users') {
+                loadUsers();
+                loadChats(); // Load chats for user creation modal
+            }
             if (tab === 'bots') loadBots();
             if (tab === 'chats') loadChats();
             if (tab === 'system') lucide.createIcons(); // Refresh icons for system panel
