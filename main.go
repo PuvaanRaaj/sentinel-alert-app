@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"html/template"
 	"log"
 	"net/http"
@@ -49,16 +50,109 @@ func main() {
 		log.Fatalf("Failed to parse template: %v", err)
 	}
 
-	// Initialize handlers
-	h := handlers.NewHandler(s, tmpl)
+	// Parse admin templates
+	adminTmpl := make(map[string]*template.Template)
+	adminTemplates := map[string]string{
+		"login":     filepath.Join("web", "templates", "admin", "login.html"),
+		"dashboard": filepath.Join("web", "templates", "admin", "dashboard.html"),
+	}
+	for name, path := range adminTemplates {
+		t, err := template.ParseFiles(path)
+		if err != nil {
+			log.Printf("Failed to parse admin template %s: %v", name, err)
+		} else {
+			adminTmpl[name] = t
+		}
+	}
 
-	// Register routes
+	// Initialize handlers
+	h := handlers.NewHandler(s, tmpl, adminTmpl)
+
+	// Initialize default admin user
+	ctx := context.Background()
+	h.InitSession(ctx)
+
+	// Public routes
 	http.HandleFunc("/", h.IndexHandler)
 	http.HandleFunc("/webhook", h.WebhookHandler)
 	http.HandleFunc("/telegram/", h.TelegramHandler)
 	http.HandleFunc("/clear", h.ClearHandler)
 	http.HandleFunc("/events", h.SSEHandler)
 	http.HandleFunc("/api/search", h.SearchHandler)
+
+	// Admin routes (login/logout)
+	http.HandleFunc("/admin/login", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.AdminLoginPage(w, r)
+		} else {
+			h.LoginHandler(w, r)
+		}
+	})
+	http.HandleFunc("/admin/logout", h.LogoutHandler)
+	http.HandleFunc("/admin/dashboard", handlers.AuthMiddleware(handlers.AdminMiddleware(h.AdminDashboardPage)))
+
+	// Admin API routes (protected)
+	http.HandleFunc("/api/admin/users", handlers.AuthMiddleware(handlers.AdminMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.GetUsersHandler(w, r)
+		case http.MethodPost:
+			h.CreateUserHandler(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})))
+	http.HandleFunc("/api/admin/users/", handlers.AuthMiddleware(handlers.AdminMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			h.UpdateUserHandler(w, r)
+		case http.MethodDelete:
+			h.DeleteUserHandler(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})))
+
+	// Bot management
+	http.HandleFunc("/api/admin/bots", handlers.AuthMiddleware(handlers.AdminMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.GetBotsHandler(w, r)
+		case http.MethodPost:
+			h.CreateBotHandler(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})))
+	http.HandleFunc("/api/admin/bots/", handlers.AuthMiddleware(handlers.AdminMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			h.DeleteBotHandler(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})))
+
+	// Chat management
+	http.HandleFunc("/api/admin/chats", handlers.AuthMiddleware(handlers.AdminMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.GetChatsHandler(w, r)
+		case http.MethodPost:
+			h.CreateChatHandler(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})))
+	http.HandleFunc("/api/admin/chats/", handlers.AuthMiddleware(handlers.AdminMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			h.DeleteChatHandler(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})))
+
+	// Bot webhook (public)
+	http.HandleFunc("/bot", h.BotWebhookHandler)
 
 	// Serve static files (PWA assets)
 	fs := http.FileServer(http.Dir("web/static"))
@@ -70,6 +164,8 @@ func main() {
 	}
 
 	log.Println("Listening on :" + port)
+	log.Println("Default admin: admin / admin123")
+	log.Println("Admin dashboard: http://localhost:" + port + "/admin/login")
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
 	}

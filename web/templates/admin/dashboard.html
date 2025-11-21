@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Sentinel Ops</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-[#0f172a] text-slate-200 min-h-screen">
+    <!-- Header -->
+    <div class="bg-[#0B1120] border-b border-slate-800 px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="bg-blue-600 p-2 rounded-lg">
+                    <i data-lucide="shield" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white">Sentinel Admin</h1>
+                    <p class="text-sm text-slate-400">System Management</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-slate-400">Welcome, <span id="username"></span></span>
+                <a href="/admin/logout" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="border-b border-slate-800">
+        <div class="px-6 flex space-x-1">
+            <button onclick="switchTab('users')" id="tab-users" class="px-6 py-3 border-b-2 border-blue-500 text-blue-400 font-medium">Users</button>
+            <button onclick="switchTab('bots')" id="tab-bots" class="px-6 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">Bots</button>
+            <button onclick="switchTab('chats')" id="tab-chats" class="px-6 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">Chats</button>
+        </div>
+    </div>
+
+    <!-- Content -->
+    <div class="p-6">
+        <!-- Users Panel -->
+        <div id="panel-users" class="max-w-6xl mx-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold">User Management</h2>
+                <button onclick="showCreateUser()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center space-x-2">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Create User</span>
+                </button>
+            </div>
+            <div id="users-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Bots Panel -->
+        <div id="panel-bots" class="hidden max-w-6xl mx-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold">Bot Management</h2>
+                <button onclick="showCreateBot()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center space-x-2">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Create Bot</span>
+                </button>
+            </div>
+            <div id="bots-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Chats Panel -->
+        <div id="panel-chats" class="hidden max-w-6xl mx-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold">Chat Management</h2>
+                <button onclick="showCreateChat()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center space-x-2">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Create Chat</span>
+                </button>
+            </div>
+            <div id="chats-list" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-xl p-6 w-full max-w-md">
+            <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'users';
+        let users = [], bots = [], chats = [];
+
+        lucide.createIcons();
+
+        // Load data
+        async function loadUsers() {
+            const res = await fetch('/api/admin/users');
+            const data = await res.json();
+            users = data.users || [];
+            renderUsers();
+        }
+
+        async function loadBots() {
+            const res = await fetch('/api/admin/bots');
+            const data = await res.json();
+            bots = data.bots || [];
+            renderBots();
+        }
+
+        async function loadChats() {
+            const res = await fetch('/api/admin/chats');
+            const data = await res.json();
+            chats = data.chats || [];
+            renderChats();
+        }
+
+        function renderUsers() {
+            const container = document.getElementById('users-list');
+            container.innerHTML = users.map(u => `
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-semibold">${u.username}</h3>
+                        <p class="text-sm text-slate-400">Role: ${u.role} | ID: ${u.id}</p>
+                    </div>
+                   <button onclick="deleteUser(${u.id})" class="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        function renderBots() {
+            const container = document.getElementById('bots-list');
+            container.innerHTML = bots.map(b => `
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold">${b.name}</h3>
+                        <button onclick="deleteBot(${b.id})" class="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm">Delete</button>
+                    </div>
+                    <div class="bg-slate-900 p-3 rounded font-mono text-xs text-green-400 mb-2">
+                        Token: ${b.token}
+                    </div>
+                    <div class="text-sm text-slate-400">
+                        Webhook URL: <code class="text-blue-400">/bot${b.token}/sendMessage</code>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderChats() {
+            const container = document.getElementById('chats-list');
+            container.innerHTML = chats.map(c => `
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-semibold">${c.name}</h3>
+                        <p class="text-sm text-slate-400">Chat ID: ${c.chat_id} | Bot ID: ${c.bot_id}</p>
+                    </div>
+                    <button onclick="deleteChat(${c.id})" class="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            ['users', 'bots', 'chats'].forEach(t => {
+                document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+                const btn = document.getElementById(`tab-${t}`);
+                if (t === tab) {
+                    btn.className = 'px-6 py-3 border-b-2 border-blue-500 text-blue-400 font-medium';
+                } else {
+                    btn.className = 'px-6 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200';
+                }
+            });
+
+            if (tab === 'users') loadUsers();
+            if (tab === 'bots') loadBots();
+            if (tab === 'chats') loadChats();
+        }
+
+        function showModal(title, content) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-content').innerHTML = content;
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function hideModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        function showCreateUser() {
+            showModal('Create User', `
+                <form onsubmit="createUser(event)" class="space-y-4">
+                    <input type="text" id="new-username" placeholder="Username" required class="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded" />
+                    <input type="password" id="new-password" placeholder="Password" required class="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded" />
+                    <select id="new-role" class="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded">
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                    <div class="flex space-x-2">
+                        <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded">Create</button>
+                        <button type="button" onclick="hideModal()" class="flex-1 px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded">Cancel</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function showCreateBot() {
+            showModal('Create Bot', `
+                <form onsubmit="createBot(event)" class="space-y-4">
+                    <input type="text" id="new-bot-name" placeholder="Bot Name" required class="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded" />
+                    <div class="flex space-x-2">
+                        <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded">Create</button>
+                        <button type="button" onclick="hideModal()" class="flex-1 px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded">Cancel</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        function showCreateChat() {
+            showModal('Create Chat', `
+                <form onsubmit="createChat(event)" class="space-y-4">
+                    <input type="text" id="new-chat-id" placeholder="Chat ID" required class="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded" />
+                    <input type="text" id="new-chat-name" placeholder="Chat Name" required class="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded" />
+                    <input type="number" id="new-chat-bot" placeholder="Bot ID" required class="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded" />
+                    <div class="flex space-x-2">
+                        <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded">Create</button>
+                        <button type="button" onclick="hideModal()" class="flex-1 px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded">Cancel</button>
+                    </div>
+                </form>
+            `);
+        }
+
+        async function createUser(e) {
+            e.preventDefault();
+            await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: document.getElementById('new-username').value,
+                    password: document.getElementById('new-password').value,
+                    role: document.getElementById('new-role').value
+                })
+            });
+            hideModal();
+            loadUsers();
+        }
+
+        async function createBot(e) {
+            e.preventDefault();
+            await fetch('/api/admin/bots', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: document.getElementById('new-bot-name').value
+                })
+            });
+            hideModal();
+            loadBots();
+        }
+
+        async function createChat(e) {
+            e.preventDefault();
+            await fetch('/api/admin/chats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: document.getElementById('new-chat-id').value,
+                    name: document.getElementById('new-chat-name').value,
+                    bot_id: parseInt(document.getElementById('new-chat-bot').value)
+                })
+            });
+            hideModal();
+            loadChats();
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Delete this user?')) return;
+            await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+            loadUsers();
+        }
+
+        async function deleteBot(id) {
+            if (!confirm('Delete this bot?')) return;
+            await fetch(`/api/admin/bots/${id}`, { method: 'DELETE' });
+            loadBots();
+        }
+
+        async function deleteChat(id) {
+            if (!confirm('Delete this chat?')) return;
+            await fetch(`/api/admin/chats/${id}`, { method: 'DELETE' });
+            loadChats();
+        }
+
+        // Initialize
+        loadUsers();
+    </script>
+</body>
+</html>

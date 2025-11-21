@@ -17,11 +17,33 @@ const (
 )
 
 type Store interface {
+	// Alert methods
 	AddAlert(ctx context.Context, source, level, title, message string) (models.Alert, error)
 	GetAlerts(ctx context.Context) ([]models.Alert, error)
 	SearchAlerts(ctx context.Context, query, level, source string) ([]models.Alert, error)
 	ClearAlerts(ctx context.Context) error
 	Subscribe(ctx context.Context) *redis.PubSub
+
+	// User methods
+	CreateUser(ctx context.Context, username, password, role string) (models.User, error)
+	GetUser(ctx context.Context, id int) (models.User, error)
+	GetUserByUsername(ctx context.Context, username string) (models.User, error)
+	GetUsers(ctx context.Context) ([]models.User, error)
+	UpdateUser(ctx context.Context, id int, username, role string) error
+	DeleteUser(ctx context.Context, id int) error
+
+	// Bot methods
+	CreateBot(ctx context.Context, name string, createdBy int) (models.Bot, error)
+	GetBot(ctx context.Context, id int) (models.Bot, error)
+	GetBotByToken(ctx context.Context, token string) (models.Bot, error)
+	GetBots(ctx context.Context) ([]models.Bot, error)
+	DeleteBot(ctx context.Context, id int) error
+
+	// Chat methods
+	CreateChat(ctx context.Context, chatID, name string, botID int) (models.Chat, error)
+	GetChat(ctx context.Context, id int) (models.Chat, error)
+	GetChats(ctx context.Context) ([]models.Chat, error)
+	DeleteChat(ctx context.Context, id int) error
 }
 
 type RedisStore struct {

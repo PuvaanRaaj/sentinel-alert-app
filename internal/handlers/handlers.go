@@ -14,15 +14,40 @@ import (
 )
 
 type Handler struct {
-	Store store.Store
-	Tmpl  *template.Template
+	Store     store.Store
+	Tmpl      *template.Template
+	AdminTmpl map[string]*template.Template
 }
 
-func NewHandler(s store.Store, tmpl *template.Template) *Handler {
+func NewHandler(s store.Store, tmpl *template.Template, adminTmpl map[string]*template.Template) *Handler {
 	return &Handler{
-		Store: s,
-		Tmpl:  tmpl,
+		Store:     s,
+		Tmpl:      tmpl,
+		AdminTmpl: adminTmpl,
 	}
+}
+
+func (h *Handler) RenderAdminPage(w http.ResponseWriter, page string, data any) {
+	if tmpl, ok := h.AdminTmpl[page]; ok {
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Println("Template error:", err)
+			http.Error(w, "Template error", http.StatusInternalServerError)
+		}
+	} else {
+		http.Error(w, "Page not found", http.StatusNotFound)
+	}
+}
+
+func (h *Handler) AdminLoginPage(w http.ResponseWriter, r *http.Request) {
+	h.RenderAdminPage(w, "login", nil)
+}
+
+func (h *Handler) AdminDashboardPage(w http.ResponseWriter, r *http.Request) {
+	userID, username, _ := GetCurrentUser(r)
+	h.RenderAdminPage(w, "dashboard", map[string]any{
+		"UserID":   userID,
+		"Username": username,
+	})
 }
 
 func (h *Handler) IndexHandler(w http.ResponseWriter, r *http.Request) {
