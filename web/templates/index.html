@@ -441,8 +441,10 @@
         let docsInitialized = false;
         let currentApiGroup = 'public';
         let currentApiEndpoint = 'login';
+        let currentBaseUrl = '';
         let sampleStatus = '';
         let sampleBody = '';
+        let filterQuery = '';
 
         function badgeForMethod(method) {
             const cls = methodColors[method] || 'bg-slate-700 text-slate-100 border border-slate-500/40';
@@ -456,17 +458,25 @@
 
         function renderApiNav() {
             const nav = document.getElementById('api-nav');
-            nav.innerHTML = apiDocs.map(group => {
+            const q = filterQuery.trim().toLowerCase();
+
+            nav.innerHTML = `
+                <div class="mb-4">
+                    <input id="api-search" value="${filterQuery}" oninput="setFilter(this.value)" class="w-full px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-800 text-sm text-slate-100 placeholder:text-slate-600 focus:border-blue-600 focus:outline-none" placeholder="Search endpoints..." />
+                </div>
+            ` + apiDocs.map(group => {
                 const isOpen = group.id === currentApiGroup;
-                const endpointsHtml = group.endpoints.map(ep => `
-                    <button onclick="selectEndpoint('${group.id}','${ep.id}')" class="w-full text-left px-3 py-2 rounded-lg border transition ${currentApiGroup === group.id && currentApiEndpoint === ep.id ? 'border-blue-500/40 bg-blue-500/10 text-blue-100' : 'border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-900'}">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold">${ep.method}</span>
-                            <span class="text-[10px] text-slate-500">${ep.path}</span>
-                        </div>
-                        <div class="text-sm font-medium">${ep.title}</div>
-                    </button>
-                `).join('');
+                const endpointsHtml = group.endpoints
+                    .filter(ep => !q || ep.title.toLowerCase().includes(q) || ep.path.toLowerCase().includes(q) || ep.method.toLowerCase().includes(q))
+                    .map(ep => `
+                        <button onclick="selectEndpoint('${group.id}','${ep.id}')" class="w-full text-left px-3 py-2 rounded-lg border transition ${currentApiGroup === group.id && currentApiEndpoint === ep.id ? 'border-blue-500/40 bg-blue-500/10 text-blue-100' : 'border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-900'}">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-semibold">${ep.method}</span>
+                                <span class="text-[10px] text-slate-500">${ep.path}</span>
+                            </div>
+                            <div class="text-sm font-medium">${ep.title}</div>
+                        </button>
+                    `).join('');
 
                 return `
                     <div class="mb-5">
@@ -475,6 +485,11 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        function setFilter(val) {
+            filterQuery = val;
+            renderApiNav();
         }
 
         function selectEndpoint(groupId, endpointId) {
@@ -488,6 +503,7 @@
             const group = apiDocs.find(g => g.id === currentApiGroup) || apiDocs[0];
             const endpoint = group.endpoints.find(e => e.id === currentApiEndpoint) || group.endpoints[0];
             const content = document.getElementById('api-content');
+            const authBadge = isAuthenticated ? `<span class="px-2 py-1 rounded-full text-[11px] bg-emerald-500/20 text-emerald-200 border border-emerald-400/40">Session: ${localStorage.getItem('userRole') || 'user'}</span>` : `<span class="px-2 py-1 rounded-full text-[11px] bg-slate-800 text-slate-200 border border-slate-700">Session: guest</span>`;
 
             content.innerHTML = `
                 <div class="flex items-center gap-3 mb-4">
@@ -495,6 +511,14 @@
                     <div>
                         <div class="text-sm text-slate-400 uppercase tracking-wide">${group.title}</div>
                         <div class="text-lg font-semibold text-slate-50">${endpoint.path}</div>
+                    </div>
+                    <div class="ml-auto flex items-center gap-3">
+                        <select id="base-url-select" onchange="setBaseUrl(this.value)" class="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-100">
+                            <option value="">Current origin</option>
+                            <option value="http://localhost:8080">Local</option>
+                            <option value="https://api.your-stage.com">Stage</option>
+                        </select>
+                        ${authBadge}
                     </div>
                 </div>
                 <div class="card-ghost rounded-2xl p-5 mb-4">
@@ -504,6 +528,26 @@
                     </div>
                     <div class="text-xl font-semibold text-slate-100 mb-1">${endpoint.title}</div>
                     <p class="text-slate-400 leading-relaxed">${endpoint.summary}</p>
+                </div>
+                <div class="card-ghost rounded-2xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="text-sm font-semibold text-slate-200">Quickstart</div>
+                        <span class="text-[11px] text-slate-500 uppercase">curl & fetch</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-[12px] text-slate-500 mb-1">cURL</div>
+                            <pre class="code-block">${buildCurl(endpoint)}</pre>
+                        </div>
+                        <div>
+                            <div class="text-[12px] text-slate-500 mb-1">JavaScript (fetch)</div>
+                            <pre class="code-block">fetch("${(currentBaseUrl || '').replace(/\/+$/, '')}${endpoint.sampleUrl || endpoint.path}${endpoint.sampleQuery && endpoint.method === 'GET' ? '?' + new URLSearchParams(endpoint.sampleQuery).toString() : ''}", {
+  method: "${endpoint.method}",
+  headers: ${endpoint.sampleBody && endpoint.method !== 'GET' ? '{ "Content-Type": "application/json" }' : '{}'},
+  ${endpoint.sampleBody && endpoint.method !== 'GET' ? `body: JSON.stringify(${JSON.stringify(endpoint.sampleBody, null, 2)}),` : ''} credentials: "${endpoint.auth === 'none' ? 'omit' : 'include'}"
+}).then(r => r.json()).then(console.log).catch(console.error);</pre>
+                        </div>
+                    </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="card-ghost rounded-2xl p-4">
@@ -525,17 +569,28 @@
                     </div>
                 </div>
                 <div class="card-ghost rounded-2xl p-4 mt-4 space-y-3">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm font-semibold text-slate-200">Try it</span>
-                            <span class="text-[11px] text-slate-500">Runs sample payload against this server</span>
-                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-semibold text-slate-200">Try it</span>
+                                <span class="text-[11px] text-slate-500">Runs sample payload against this server</span>
+                            </div>
                         <button id="run-sample-btn" onclick="runSample()" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-semibold text-white shadow shadow-blue-900/30 disabled:opacity-50 disabled:cursor-not-allowed">Run sample</button>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-slate-500">
+                        <label class="flex items-center gap-2">
+                            <input id="send-auth-toggle" type="checkbox" class="accent-blue-500" checked>
+                            Send session cookie
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input id="pretty-toggle" type="checkbox" class="accent-blue-500" checked>
+                            Pretty-print JSON
+                        </label>
+                        <button onclick="copyResponse()" class="ml-auto px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-200 hover:border-slate-500 hover:text-white transition">Copy response</button>
                     </div>
                     <div id="sample-status" class="text-[12px] text-slate-400"></div>
                     <pre id="sample-result" class="code-block whitespace-pre-wrap">${sampleBody || '// click "Run sample" to see live or simulated response'}</pre>
                 </div>
-            `;
+                `;
         }
 
         function initApiDocs() {
@@ -590,7 +645,13 @@
 
             const headers = {};
             const options = { method: endpoint.method, headers };
+            const sendAuth = document.getElementById('send-auth-toggle')?.checked ?? true;
             let url = endpoint.sampleUrl || endpoint.path;
+
+            // Prepend base URL if selected
+            if (currentBaseUrl) {
+                url = currentBaseUrl.replace(/\/+$/, '') + url;
+            }
 
             if (endpoint.sampleBody && endpoint.method !== 'GET') {
                 headers['Content-Type'] = 'application/json';
@@ -606,17 +667,46 @@
             resultEl.textContent = '';
 
             try {
-                const res = await fetch(url, options);
+                const res = await fetch(url, { ...options, credentials: sendAuth ? 'include' : 'omit' });
                 const text = await res.text();
                 const prefix = res.ok ? '✅ Success' : `⚠️ ${res.status}`;
                 statusEl.textContent = `${prefix} • ${endpoint.method} ${url}`;
-                resultEl.textContent = text || '(empty response)';
+                if (document.getElementById('pretty-toggle')?.checked) {
+                    try {
+                        const parsed = JSON.parse(text);
+                        resultEl.textContent = JSON.stringify(parsed, null, 2);
+                    } catch {
+                        resultEl.textContent = text || '(empty response)';
+                    }
+                } else {
+                    resultEl.textContent = text || '(empty response)';
+                }
             } catch (err) {
                 statusEl.textContent = '⚠️ Request failed (showing mock response)';
                 resultEl.textContent = typeof endpoint.response === 'string' ? endpoint.response : JSON.stringify(endpoint.response, null, 2);
             } finally {
                 btn.disabled = false;
             }
+        }
+
+        function copyResponse() {
+            const resultEl = document.getElementById('sample-result');
+            if (!resultEl) return;
+            const text = resultEl.textContent || '';
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text)
+                    .then(() => {
+                        const statusEl = document.getElementById('sample-status');
+                        if (statusEl) statusEl.textContent = '✅ Response copied';
+                    })
+                    .catch(() => alert('Copy failed. Please copy manually.'));
+            } else {
+                alert(text);
+            }
+        }
+
+        function setBaseUrl(val) {
+            currentBaseUrl = val;
         }
 
         // --- Authentication Functions ---
