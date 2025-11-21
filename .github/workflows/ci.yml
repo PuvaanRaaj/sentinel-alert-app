@@ -46,7 +46,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     env:
-      IMAGE_NAME: ghcr.io/${{ github.repository }}
+      IMAGE_NAME: ghcr.io/${{ github.repository }} # normalized to lowercase below
       DOCKERFILE: Dockerfile
       PLATFORMS: linux/amd64,linux/arm64
     steps:
@@ -55,6 +55,9 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Normalize image name (lowercase)
+        run: echo "IMAGE_NAME=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: Docker meta
         id: meta
