@@ -1012,15 +1012,17 @@
         // --- Push Notifications ---
 
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/sw.js').then(function(reg) {
-                console.log('Service Worker Registered');
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function(reg) {
+                console.log('Service Worker Registered with scope:', reg.scope);
                 checkPushSubscription();
             });
         }
 
         async function checkPushSubscription() {
             try {
+                console.log('Checking SW ready...');
                 const reg = await navigator.serviceWorker.ready;
+                console.log('SW Ready. Checking subscription...');
                 const sub = await reg.pushManager.getSubscription();
                 console.log('Current Subscription:', sub);
                 updatePushUI(!!sub);
@@ -1056,34 +1058,47 @@
         async function togglePushNotifications() {
             console.log('Toggle Push Notifications clicked');
             try {
+                console.log('Waiting for SW ready...');
                 const reg = await navigator.serviceWorker.ready;
+                console.log('SW Ready. Checking existing sub...');
                 const sub = await reg.pushManager.getSubscription();
-                if (sub) return;
+                if (sub) {
+                    console.log('Already subscribed');
+                    return;
+                }
 
                 // Request permission
+                console.log('Requesting permission...');
                 const permission = await Notification.requestPermission();
+                console.log('Permission result:', permission);
                 if (permission !== 'granted') {
                     alert('Permission denied');
                     return;
                 }
 
                 // Get VAPID key
+                console.log('Fetching VAPID key...');
                 const res = await fetch('/api/push/vapid-public-key');
                 const data = await res.json();
                 const publicKey = data.publicKey;
+                console.log('VAPID Key fetched');
 
                 // Subscribe
+                console.log('Subscribing to PushManager...');
                 const newSub = await reg.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: urlBase64ToUint8Array(publicKey)
                 });
+                console.log('Subscribed:', newSub);
 
                 // Send to backend
+                console.log('Sending subscription to backend...');
                 await fetch('/api/push/subscribe', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(newSub)
                 });
+                console.log('Subscription saved on backend');
 
                 alert('Push Notifications Enabled! 🚀');
                 updatePushUI(true);

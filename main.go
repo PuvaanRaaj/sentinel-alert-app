@@ -189,6 +189,12 @@ func main() {
 	// Admin user management
 	http.HandleFunc("/api/admin/reset-password", handlers.AuthMiddleware(handlers.AdminMiddleware(h.AdminResetPasswordHandler)))
 
+	// Serve sw.js at root for Service Worker scope
+	http.HandleFunc("/sw.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript")
+		http.ServeFile(w, r, "web/static/sw.js")
+	})
+
 	// 2FA routes
 	http.HandleFunc("/api/user/2fa/generate", h.Generate2FAHandler)
 	http.HandleFunc("/api/user/2fa/enable", h.Enable2FAHandler)

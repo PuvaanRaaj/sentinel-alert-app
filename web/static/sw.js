@@ -1,3 +1,13 @@
+self.addEventListener('install', (event) => {
+  console.log('Service Worker: Installing...');
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker: Activating...');
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', function (event) {
   let body = 'New Incident Alert!';
   if (event.data) {
