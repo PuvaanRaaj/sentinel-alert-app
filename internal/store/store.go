@@ -48,6 +48,12 @@ type AdminStore interface {
 	GetChat(ctx context.Context, id int) (models.Chat, error)
 	GetChats(ctx context.Context) ([]models.Chat, error)
 	DeleteChat(ctx context.Context, id int) error
+
+	// User-Chat Permission methods
+	AssignChatToUser(ctx context.Context, userID, chatID int) error
+	RemoveChatFromUser(ctx context.Context, userID, chatID int) error
+	GetUserChats(ctx context.Context, userID int) ([]models.Chat, error)
+	GetChatUsers(ctx context.Context, chatID int) ([]models.User, error)
 }
 
 type RedisStore struct {

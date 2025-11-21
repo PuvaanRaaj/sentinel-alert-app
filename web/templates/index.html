@@ -232,6 +232,12 @@
                         localStorage.setItem('userId', data.user.id);
                         localStorage.setItem('username', data.user.username);
                         localStorage.setItem('userRole', data.user.role);
+                        
+                        // Store allowed chats for filtering
+                        if (data.allowed_chats) {
+                            localStorage.setItem('allowedChats', JSON.stringify(data.allowed_chats));
+                        }
+                        
                         isAuthenticated = true;
                         currentUser = data.user;
                         
@@ -239,6 +245,9 @@
                         document.getElementById('user-profile').classList.remove('hidden');
                         document.getElementById('user-name').textContent = data.user.username;
                         hideLoginOverlay();
+                        
+                        // Reload chats with permissions
+                        await loadChats();
                         renderChannels(); // Refresh to remove locks
                         lucide.createIcons();
                     }
@@ -260,11 +269,16 @@
                 // Clear session
                 localStorage.removeItem('userId');
                 localStorage.removeItem('username');
+                localStorage.removeItem('userRole');
+                localStorage.removeItem('allowedChats');
                 isAuthenticated = false;
                 currentUser = null;
                 
                 // Update UI
                 document.getElementById('user-profile').classList.add('hidden');
+                
+                // Reset channels to general only
+                channels = [{ id: 'general', name: 'General', icon: 'hash' }];
                 
                 // Switch to general if on a protected channel
                 if (currentChannelId !== 'general' && currentChannelId !== 'integration') {
@@ -288,10 +302,28 @@
             try {
                 const res = await fetch('/api/chats');
                 const data = await res.json();
-                const chats = data.chats || [];
+                const allChats = data.chats || [];
                 
-                // Add each chat as a channel
-                chats.forEach(chat => {
+                // Get user role and allowed chats
+                const userRole = localStorage.getItem('userRole');
+                const allowedChatsStr = localStorage.getItem('allowedChats');
+                const allowedChats = allowedChatsStr ? JSON.parse(allowedChatsStr) : [];
+                
+                // Filter chats based on permissions
+                let chatsToShow = allChats;
+                if (userRole !== 'admin' && allowedChats.length > 0) {
+                    // Regular user: only show assigned chats
+                    chatsToShow = allChats.filter(chat => 
+                        allowedChats.some(allowed => allowed.chat_id === chat.chat_id)
+                    );
+                }
+                // Admin users see all chats (no filtering needed)
+                
+                // Reset channels to General
+                channels = [{ id: 'general', name: 'General', icon: 'hash' }];
+                
+                // Add filtered chats as channels
+                chatsToShow.forEach(chat => {
                     channels.push({
                         id: chat.chat_id,
                         name: chat.name,

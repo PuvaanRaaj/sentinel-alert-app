@@ -28,6 +28,7 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Role     string `json:"role"`
+		ChatIDs  []int  `json:"chat_ids"` // New: chat permissions
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -35,10 +36,25 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate role
+	if req.Role != "admin" && req.Role != "user" {
+		http.Error(w, "Invalid role", http.StatusBadRequest)
+		return
+	}
+
 	user, err := h.AdminStore.CreateUser(r.Context(), req.Username, req.Password, req.Role)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Assign chat permissions for non-admin users
+	if req.Role != "admin" && len(req.ChatIDs) > 0 {
+		for _, chatID := range req.ChatIDs {
+			if err := h.AdminStore.AssignChatToUser(r.Context(), user.ID, chatID); err != nil {
+				log.Printf("Failed to assign chat %d to user %d: %v", chatID, user.ID, err)
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -253,3 +253,75 @@ func (s *PostgresStore) DeleteChat(ctx context.Context, id int) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM chats WHERE id = $1`, id)
 	return err
 }
+
+// User-Chat Permission methods
+
+func (s *PostgresStore) AssignChatToUser(ctx context.Context, userID, chatID int) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO user_chat_permissions (user_id, chat_id, created_at)
+		 VALUES ($1, $2, NOW())
+		 ON CONFLICT (user_id, chat_id) DO NOTHING`,
+		userID, chatID,
+	)
+	return err
+}
+
+func (s *PostgresStore) RemoveChatFromUser(ctx context.Context, userID, chatID int) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM user_chat_permissions WHERE user_id = $1 AND chat_id = $2`,
+		userID, chatID,
+	)
+	return err
+}
+
+func (s *PostgresStore) GetUserChats(ctx context.Context, userID int) ([]models.Chat, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT c.id, c.chat_id, c.name, c.bot_id, c.created_at 
+		 FROM chats c
+		 INNER JOIN user_chat_permissions ucp ON c.id = ucp.chat_id
+		 WHERE ucp.user_id = $1
+		 ORDER BY c.created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var chats []models.Chat
+	for rows.Next() {
+		var chat models.Chat
+		if err := rows.Scan(&chat.ID, &chat.ChatID, &chat.Name, &chat.BotID, &chat.CreatedAt); err != nil {
+			continue
+		}
+		chats = append(chats, chat)
+	}
+
+	return chats, nil
+}
+
+func (s *PostgresStore) GetChatUsers(ctx context.Context, chatID int) ([]models.User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT u.id, u.username, u.password_hash, u.role, u.created_at
+		 FROM users u
+		 INNER JOIN user_chat_permissions ucp ON u.id = ucp.user_id
+		 WHERE ucp.chat_id = $1
+		 ORDER BY u.username ASC`,
+		chatID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt); err != nil {
+			continue
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}

@@ -39,6 +39,32 @@ func (h *Handler) PublicLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get user's allowed chats
+	var allowedChats []any
+	if user.Role == "admin" {
+		// Admin sees all chats
+		chats, _ := h.AdminStore.GetChats(r.Context())
+		for _, chat := range chats {
+			allowedChats = append(allowedChats, map[string]any{
+				"id":      chat.ID,
+				"chat_id": chat.ChatID,
+				"name":    chat.Name,
+				"bot_id":  chat.BotID,
+			})
+		}
+	} else {
+		// Regular user sees only assigned chats
+		chats, _ := h.AdminStore.GetUserChats(r.Context(), user.ID)
+		for _, chat := range chats {
+			allowedChats = append(allowedChats, map[string]any{
+				"id":      chat.ID,
+				"chat_id": chat.ChatID,
+				"name":    chat.Name,
+				"bot_id":  chat.BotID,
+			})
+		}
+	}
+
 	// Return user info (without password hash)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
@@ -48,5 +74,6 @@ func (h *Handler) PublicLoginHandler(w http.ResponseWriter, r *http.Request) {
 			"username": user.Username,
 			"role":     user.Role,
 		},
+		"allowed_chats": allowedChats,
 	})
 }
