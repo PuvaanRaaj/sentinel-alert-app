@@ -7,8 +7,40 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+var (
+	botRateMu    sync.Mutex
+	botRateUsage = make(map[string][]time.Time) // token -> timestamps of recent calls
+	botWindow    = time.Minute
+)
+
+func allowBotToken(token string, limit int) bool {
+	if limit <= 0 {
+		limit = 60
+	}
+	now := time.Now()
+	botRateMu.Lock()
+	defer botRateMu.Unlock()
+	ts := botRateUsage[token]
+	// prune
+	cutoff := now.Add(-botWindow)
+	pruned := ts[:0]
+	for _, t := range ts {
+		if t.After(cutoff) {
+			pruned = append(pruned, t)
+		}
+	}
+	if len(pruned) >= limit {
+		botRateUsage[token] = pruned
+		return false
+	}
+	pruned = append(pruned, now)
+	botRateUsage[token] = pruned
+	return true
+}
 
 // === User Management ===
 
@@ -328,11 +360,6 @@ func (h *Handler) BotWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !validateSharedSecret(r) {
-		http.Error(w, "invalid signature", http.StatusUnauthorized)
-		return
-	}
-
 	// Extract token from path: /bot/{token}/sendMessage
 	path := r.URL.Path
 
@@ -358,6 +385,11 @@ func (h *Handler) BotWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Invalid bot token: %s", token)
 		http.Error(w, "Invalid bot token", http.StatusUnauthorized)
+		return
+	}
+
+	if !allowBotToken(token, bot.RateLimit) {
+		http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 		return
 	}
 
@@ -394,6 +426,12 @@ func (h *Handler) BotWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	level := strings.ToLower(getString(payload["level"]))
 	if level == "" {
 		level = "info"
+	}
+
+	// Signature validation with per-bot secret
+	if !validateSignature(r, bot.HMACSecret, r.Header.Get("X-Sentinel-Signature")) {
+		http.Error(w, "invalid signature", http.StatusUnauthorized)
+		return
 	}
 
 	// Create alert with chat_id in source for filtering

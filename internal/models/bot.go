@@ -7,11 +7,13 @@ import (
 )
 
 type Bot struct {
-	ID        int       `json:"id"`
-	Token     string    `json:"token"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
-	CreatedBy int       `json:"created_by"`
+	ID         int       `json:"id"`
+	Token      string    `json:"token"`
+	Name       string    `json:"name"`
+	CreatedAt  time.Time `json:"created_at"`
+	CreatedBy  int       `json:"created_by"`
+	HMACSecret string    `json:"hmac_secret"`
+	RateLimit  int       `json:"rate_limit"`
 }
 
 type Chat struct {

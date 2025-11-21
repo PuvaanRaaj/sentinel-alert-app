@@ -256,14 +256,18 @@ func (s *PostgresStore) CreateBot(ctx context.Context, name string, createdBy in
 	if err != nil {
 		return models.Bot{}, err
 	}
+	secret, err := models.GenerateToken()
+	if err != nil {
+		return models.Bot{}, err
+	}
 
 	var bot models.Bot
 	err = s.db.QueryRowContext(ctx,
-		`INSERT INTO bots (token, name, created_by, created_at) 
-		 VALUES ($1, $2, $3, NOW()) 
-		 RETURNING id, token, name, created_by, created_at`,
-		token, name, createdBy,
-	).Scan(&bot.ID, &bot.Token, &bot.Name, &bot.CreatedBy, &bot.CreatedAt)
+		`INSERT INTO bots (token, name, hmac_secret, rate_limit, created_by, created_at) 
+		 VALUES ($1, $2, $3, 60, $4, NOW()) 
+		 RETURNING id, token, name, hmac_secret, rate_limit, created_by, created_at`,
+		token, name, secret, createdBy,
+	).Scan(&bot.ID, &bot.Token, &bot.Name, &bot.HMACSecret, &bot.RateLimit, &bot.CreatedBy, &bot.CreatedAt)
 
 	return bot, err
 }
@@ -271,9 +275,9 @@ func (s *PostgresStore) CreateBot(ctx context.Context, name string, createdBy in
 func (s *PostgresStore) GetBot(ctx context.Context, id int) (models.Bot, error) {
 	var bot models.Bot
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, token, name, created_by, created_at FROM bots WHERE id = $1`,
+		`SELECT id, token, name, hmac_secret, rate_limit, created_by, created_at FROM bots WHERE id = $1`,
 		id,
-	).Scan(&bot.ID, &bot.Token, &bot.Name, &bot.CreatedBy, &bot.CreatedAt)
+	).Scan(&bot.ID, &bot.Token, &bot.Name, &bot.HMACSecret, &bot.RateLimit, &bot.CreatedBy, &bot.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return models.Bot{}, errors.New("bot not found")
@@ -284,9 +288,9 @@ func (s *PostgresStore) GetBot(ctx context.Context, id int) (models.Bot, error) 
 func (s *PostgresStore) GetBotByToken(ctx context.Context, token string) (models.Bot, error) {
 	var bot models.Bot
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, token, name, created_by, created_at FROM bots WHERE token = $1`,
+		`SELECT id, token, name, hmac_secret, rate_limit, created_by, created_at FROM bots WHERE token = $1`,
 		token,
-	).Scan(&bot.ID, &bot.Token, &bot.Name, &bot.CreatedBy, &bot.CreatedAt)
+	).Scan(&bot.ID, &bot.Token, &bot.Name, &bot.HMACSecret, &bot.RateLimit, &bot.CreatedBy, &bot.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return models.Bot{}, errors.New("bot not found")
@@ -296,7 +300,7 @@ func (s *PostgresStore) GetBotByToken(ctx context.Context, token string) (models
 
 func (s *PostgresStore) GetBots(ctx context.Context) ([]models.Bot, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, token, name, created_by, created_at FROM bots ORDER BY created_at DESC`,
+		`SELECT id, token, name, hmac_secret, rate_limit, created_by, created_at FROM bots ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return nil, err
@@ -306,7 +310,7 @@ func (s *PostgresStore) GetBots(ctx context.Context) ([]models.Bot, error) {
 	var bots []models.Bot
 	for rows.Next() {
 		var bot models.Bot
-		if err := rows.Scan(&bot.ID, &bot.Token, &bot.Name, &bot.CreatedBy, &bot.CreatedAt); err != nil {
+		if err := rows.Scan(&bot.ID, &bot.Token, &bot.Name, &bot.HMACSecret, &bot.RateLimit, &bot.CreatedBy, &bot.CreatedAt); err != nil {
 			continue
 		}
 		bots = append(bots, bot)

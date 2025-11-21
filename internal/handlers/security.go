@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
+	"time"
 )
 
 // validateSharedSecret checks X-Sentinel-Signature against HMAC-SHA256(body, secret).
@@ -17,7 +19,11 @@ func validateSharedSecret(r *http.Request) bool {
 	if secret == "" {
 		return true
 	}
-	sig := r.Header.Get("X-Sentinel-Signature")
+	return validateSignature(r, secret, r.Header.Get("X-Sentinel-Signature"))
+}
+
+// validateSignature validates HMAC for a given secret with timestamp and nonce checks.
+func validateSignature(r *http.Request, secret, sig string) bool {
 	if sig == "" {
 		return false
 	}
@@ -30,5 +36,45 @@ func validateSharedSecret(r *http.Request) bool {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	expected := hex.EncodeToString(mac.Sum(nil))
+	ts := r.Header.Get("X-Sentinel-Timestamp")
+	nonce := r.Header.Get("X-Sentinel-Nonce")
+	if ts != "" && nonce != "" {
+		mac.Reset()
+		mac.Write([]byte(ts))
+		mac.Write([]byte("." + nonce + "."))
+		mac.Write(body)
+		expected = hex.EncodeToString(mac.Sum(nil))
+		if !withinSkew(ts) || isReplay(nonce) {
+			return false
+		}
+	}
 	return hmac.Equal([]byte(sig), []byte(expected))
+}
+
+var (
+	nonceCache   = make(map[string]time.Time)
+	nonceCacheMu sync.Mutex
+	maxSkew      = 5 * time.Minute
+)
+
+func withinSkew(ts string) bool {
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return false
+	}
+	now := time.Now()
+	return t.After(now.Add(-maxSkew)) && t.Before(now.Add(maxSkew))
+}
+
+func isReplay(nonce string) bool {
+	nonceCacheMu.Lock()
+	defer nonceCacheMu.Unlock()
+	if nonce == "" {
+		return false
+	}
+	if exp, ok := nonceCache[nonce]; ok && exp.After(time.Now()) {
+		return true
+	}
+	nonceCache[nonce] = time.Now().Add(maxSkew)
+	return false
 }
