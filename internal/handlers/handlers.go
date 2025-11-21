@@ -293,6 +293,120 @@ func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) SlackWebhookHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var payload struct {
+		Text        string `json:"text"`
+		Attachments []struct {
+			Title string `json:"title"`
+			Text  string `json:"text"`
+			Color string `json:"color"`
+		} `json:"attachments"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	title := "Slack Alert"
+	message := payload.Text
+	level := "info"
+
+	// Check attachments for more details
+	if len(payload.Attachments) > 0 {
+		att := payload.Attachments[0]
+		if att.Title != "" {
+			title = att.Title
+		}
+		if att.Text != "" {
+			message += "\n" + att.Text
+		}
+		if att.Color == "danger" || att.Color == "#ff0000" {
+			level = "critical"
+		} else if att.Color == "warning" || att.Color == "#ffcc00" {
+			level = "warning"
+		} else if att.Color == "good" || att.Color == "#00ff00" {
+			level = "success"
+		}
+	}
+
+	if message == "" {
+		message = "No content"
+	}
+
+	a, err := h.AlertStore.AddAlert(r.Context(), "slack", level, title, message)
+	if err != nil {
+		log.Println("Failed to add alert:", err)
+		http.Error(w, "Failed to add alert", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "ok: %d", a.ID)
+}
+
+func (h *Handler) DiscordWebhookHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var payload struct {
+		Content string `json:"content"`
+		Embeds  []struct {
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Color       int    `json:"color"`
+		} `json:"embeds"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	title := "Discord Alert"
+	message := payload.Content
+	level := "info"
+
+	if len(payload.Embeds) > 0 {
+		embed := payload.Embeds[0]
+		if embed.Title != "" {
+			title = embed.Title
+		}
+		if embed.Description != "" {
+			message += "\n" + embed.Description
+		}
+		// Discord colors (decimal)
+		if embed.Color == 15158332 { // Red
+			level = "critical"
+		} else if embed.Color == 15105570 { // Orange
+			level = "warning"
+		} else if embed.Color == 3066993 { // Green
+			level = "success"
+		}
+	}
+
+	if message == "" {
+		message = "No content"
+	}
+
+	a, err := h.AlertStore.AddAlert(r.Context(), "discord", level, title, message)
+	if err != nil {
+		log.Println("Failed to add alert:", err)
+		http.Error(w, "Failed to add alert", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "ok: %d", a.ID)
+}
+
 func getString(v any) string {
 	switch t := v.(type) {
 	case string:

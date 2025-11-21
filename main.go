@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
@@ -208,6 +209,15 @@ func main() {
 	// Push Notification routes
 	http.HandleFunc("/api/push/vapid-public-key", h.GetVAPIDKeyHandler)
 	http.HandleFunc("/api/push/subscribe", h.SubscribePushHandler)
+
+	// New Webhook Integrations
+	http.HandleFunc("/api/slack/webhook", h.SlackWebhookHandler)
+	http.HandleFunc("/api/discord/webhook", h.DiscordWebhookHandler)
+
+	// Swagger UI
+	http.HandleFunc("/swagger/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/static/swagger/"+strings.TrimPrefix(r.URL.Path, "/swagger/"))
+	})
 
 	// Start background listener for push notifications
 	go func() {

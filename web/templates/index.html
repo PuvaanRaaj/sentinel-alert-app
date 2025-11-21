@@ -277,50 +277,51 @@
                 <p class="text-sm mt-2 text-slate-600">No active alerts in this channel</p>
             </div>
 
-            <!-- Integration Guide (Hidden by default) -->
-            <div id="integration-guide" class="hidden max-w-5xl mx-auto p-4">
-                <div class="mb-8">
-                    <h2 class="text-2xl font-bold text-white mb-2">System Integration</h2>
-                    <p class="text-slate-400">Connect your backend services to the Sentinel Network.</p>
-                </div>
-                <div class="grid gap-6 md:grid-cols-3 mb-8">
-                    <div class="bg-slate-800/30 border border-slate-700/50 p-4 rounded-xl">
-                        <div class="text-blue-500 text-xs font-bold uppercase tracking-wider mb-1">Endpoint</div>
-                        <div class="font-semibold text-slate-200 mb-2">POST /webhook</div>
-                        <code class="text-[10px] bg-slate-900 p-1 rounded text-slate-400 font-mono">Content-Type: application/json</code>
-                    </div>
-                    <div class="bg-slate-800/30 border border-slate-700/50 p-4 rounded-xl">
-                        <div class="text-blue-500 text-xs font-bold uppercase tracking-wider mb-1">Payload</div>
-                        <div class="font-semibold text-slate-200 mb-2">JSON Object</div>
-                        <code class="text-[10px] bg-slate-900 p-1 rounded text-slate-400 font-mono">{ "title": "...", "message": "..." }</code>
-                    </div>
-                    <div class="bg-slate-800/30 border border-slate-700/50 p-4 rounded-xl">
-                        <div class="text-blue-500 text-xs font-bold uppercase tracking-wider mb-1">Example</div>
-                        <div class="font-semibold text-slate-200 mb-2">cURL</div>
-                        <code class="text-[10px] bg-slate-900 p-1 rounded text-slate-400 font-mono">curl -X POST ...</code>
-                    </div>
-                </div>
-                <div class="relative bg-[#0B1120] rounded-xl border border-slate-800 overflow-hidden">
-                    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/50">
-                        <div class="flex items-center space-x-2">
-                            <div class="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
-                            <div class="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
-                            <div class="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
-                        </div>
-                    </div>
-                    <pre class="p-6 text-sm font-mono text-slate-300 overflow-x-auto leading-relaxed">
-<span class="text-purple-400">curl</span> -X POST http://localhost:8080/webhook \
-  -H <span class="text-green-400">"Content-Type: application/json"</span> \
-  -d <span class="text-green-400">'{
-    "source": "backend-api",
-    "level": "error",
-    "title": "Database Connection Failed",
-    "message": "Connection timeout after 5000ms"
-  }'</span></pre>
+            <!-- Integration Guide (Replaced with Swagger UI) -->
+            <div id="integration-guide" class="hidden h-full">
+                <div class="h-full flex bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl shadow-slate-900/50">
+                    <aside class="w-72 bg-slate-950/70 border-r border-slate-800/70 p-4 overflow-y-auto" id="api-nav"></aside>
+                    <main class="flex-1 p-6 overflow-y-auto bg-slate-900/80" id="api-content"></main>
                 </div>
             </div>
         </div>
     </div>
+
+    <style>
+        /* Custom API doc styling */
+        .method-pill {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            padding: 4px 10px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-transform: uppercase;
+        }
+        .method-pill span {
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+        .card-ghost {
+            background: linear-gradient(145deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9));
+            border: 1px solid rgba(148,163,184,0.08);
+        }
+        .code-block {
+            background: #0b1222;
+            border: 1px solid #1f2937;
+            border-radius: 14px;
+            font-family: "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 13px;
+            color: #e2e8f0;
+            padding: 14px 16px;
+            overflow-x: auto;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+        }
+    </style>
 
     <script>
         // --- Authentication State ---
@@ -372,6 +373,249 @@
                 }
             } else {
                 document.getElementById('user-profile').classList.add('hidden');
+            }
+        }
+
+        // --- Custom API Docs (GitBook-style) ---
+        const apiDocs = [
+            {
+                id: 'public',
+                title: 'Public API',
+                description: 'Open endpoints for bots, webhooks, and discovery.',
+                endpoints: [
+                    { id: 'login', method: 'POST', path: '/api/login', title: 'Login', summary: 'Authenticate and set a session cookie. May require 2FA if enabled.', auth: 'none', sampleUrl: '/api/login', sampleBody: { "username": "admin", "password": "admin123" }, request: `{\n  "username": "admin",\n  "password": "admin123"\n}`, response: `{\n  "requires_2fa": true,\n  "user_id": 1\n}` },
+                    { id: 'verify2fa', method: 'POST', path: '/api/login/verify-2fa', title: 'Verify 2FA', summary: 'Complete 2FA challenge after login.', auth: 'none', sampleUrl: '/api/login/verify-2fa', sampleBody: { "user_id": 1, "code": "123456" }, request: `{\n  "user_id": 1,\n  "code": "123456"\n}`, response: `{\n  "status": "ok"\n}` },
+                    { id: 'search', method: 'GET', path: '/api/search', title: 'Search Alerts', summary: 'Query alerts by text, level, or source.', auth: 'none', sampleUrl: '/api/search', sampleQuery: { "q": "timeout", "level": "error" }, request: `GET /api/search?q=timeout&level=error`, response: `{\n  "count": 2,\n  "alerts": [\n    { "title": "DB latency", "level": "error", "source": "bot:db:chat:general" }\n  ]\n}` },
+                    { id: 'chats', method: 'GET', path: '/api/chats', title: 'List Chats', summary: 'Public list of chat channels.', auth: 'none', sampleUrl: '/api/chats', request: `GET /api/chats`, response: `{\n  "chats": [\n    { "chat_id": "general", "name": "General" }\n  ]\n}` },
+                    { id: 'vapid', method: 'GET', path: '/api/push/vapid-public-key', title: 'VAPID Key', summary: 'Fetch public VAPID key for push subscriptions.', auth: 'none', sampleUrl: '/api/push/vapid-public-key', request: `GET /api/push/vapid-public-key`, response: `"BNEay..."` },
+                    { id: 'subscribe', method: 'POST', path: '/api/push/subscribe', title: 'Subscribe to Push', summary: 'Register a push subscription.', auth: 'none', sampleUrl: '/api/push/subscribe', sampleBody: { "endpoint": "https://fcm.googleapis.com/fcm/send/demo", "keys": { "p256dh": "demo", "auth": "demo" } }, request: `{\n  "endpoint": "https://fcm.googleapis.com/fcm/send/...",\n  "keys": { "p256dh": "...", "auth": "..." }\n}`, response: `{\n  "status": "ok"\n}` },
+                    { id: 'webhook', method: 'POST', path: '/webhook', title: 'Generic Webhook', summary: 'Send an alert with a simple JSON payload.', auth: 'none', sampleUrl: '/webhook', sampleBody: { "title": "System Down", "message": "Server X not responding", "level": "error", "source": "pagerduty" }, request: `{\n  "title": "System Down",\n  "message": "Server X not responding",\n  "level": "error",\n  "source": "pagerduty"\n}`, response: `{\n  "status": "created",\n  "id": 42\n}` },
+                    { id: 'slack', method: 'POST', path: '/api/slack/webhook', title: 'Slack Webhook', summary: 'Slack-compatible alert payload.', auth: 'none', sampleUrl: '/api/slack/webhook', sampleBody: { "text": "Deployment failed", "attachments": [ { "title": "Error", "text": "Timeout" } ] }, request: `{\n  "text": "Deployment failed",\n  "attachments": [ { "title": "Error", "text": "Timeout" } ]\n}`, response: `{"status": "created"}` },
+                    { id: 'discord', method: 'POST', path: '/api/discord/webhook', title: 'Discord Webhook', summary: 'Discord-compatible alert payload.', auth: 'none', sampleUrl: '/api/discord/webhook', sampleBody: { "content": "Alert!", "embeds": [ { "title": "DB Down", "description": "Cannot connect" } ] }, request: `{\n  "content": "Alert!",\n  "embeds": [ { "title": "DB Down", "description": "Cannot connect" } ]\n}`, response: `{"status": "created"}` },
+                    { id: 'botwebhook', method: 'POST', path: '/bot/{token}', title: 'Bot Webhook', summary: 'Post alerts using a bot token.', auth: 'none', sampleUrl: '/bot/demo-token', sampleBody: { "title": "CPU High", "message": "95% usage", "level": "warning" }, request: `POST /bot/<token>\n{\n  "title": "CPU High",\n  "message": "95% usage",\n  "level": "warning"\n}`, response: `{"status": "created"}` },
+                ]
+            },
+            {
+                id: 'user',
+                title: 'User API',
+                description: 'Session-bound endpoints for authenticated users.',
+                endpoints: [
+                    { id: 'me', method: 'GET', path: '/api/user/me', title: 'Current User', summary: 'Return the current user profile.', auth: 'cookie', sampleUrl: '/api/user/me', request: `GET /api/user/me`, response: `{\n  "id": 1,\n  "username": "admin",\n  "role": "admin",\n  "totp_enabled": true\n}` },
+                    { id: 'profile', method: 'PUT', path: '/api/user/profile', title: 'Update Profile', summary: 'Update username.', auth: 'cookie', sampleUrl: '/api/user/profile', sampleBody: { "username": "new-name" }, request: `{\n  "username": "new-name"\n}`, response: `{"status": "updated"}` },
+                    { id: 'changePassword', method: 'POST', path: '/api/user/change-password', title: 'Change Password', summary: 'Change current password.', auth: 'cookie', sampleUrl: '/api/user/change-password', sampleBody: { "current_password": "oldpass", "new_password": "StrongPass123" }, request: `{\n  "current_password": "oldpass",\n  "new_password": "StrongPass123"\n}`, response: `{"status": "updated"}` },
+                    { id: 'generate2fa', method: 'POST', path: '/api/user/2fa/generate', title: 'Generate 2FA Secret', summary: 'Create a new TOTP secret.', auth: 'cookie', sampleUrl: '/api/user/2fa/generate', request: `POST /api/user/2fa/generate`, response: `{\n  "secret": "JBSWY3DPEHPK3PXP",\n  "otpauth_url": "otpauth://..."\n}` },
+                    { id: 'enable2fa', method: 'POST', path: '/api/user/2fa/enable', title: 'Enable 2FA', summary: 'Confirm 2FA with an OTP code.', auth: 'cookie', sampleUrl: '/api/user/2fa/enable', sampleBody: { "code": "123456" }, request: `{\n  "code": "123456"\n}`, response: `{"status": "enabled"}` },
+                    { id: 'disable2fa', method: 'POST', path: '/api/user/2fa/disable', title: 'Disable 2FA', summary: 'Disable 2FA for your account.', auth: 'cookie', sampleUrl: '/api/user/2fa/disable', sampleBody: { "user_id": 1 }, request: `{\n  "user_id": 1\n}`, response: `{"status": "disabled"}` },
+                ]
+            },
+            {
+                id: 'admin',
+                title: 'Admin / Developer',
+                description: 'Privileged endpoints for developers/admins.',
+                endpoints: [
+                    { id: 'adminUsers', method: 'GET', path: '/api/admin/users', title: 'List Users', summary: 'Fetch all users.', auth: 'cookie', sampleUrl: '/api/admin/users', request: `GET /api/admin/users`, response: `{"users":[{"id":1,"username":"admin","role":"admin"}]}` },
+                    { id: 'adminCreateUser', method: 'POST', path: '/api/admin/users', title: 'Create User', summary: 'Create a new user with role.', auth: 'cookie', sampleUrl: '/api/admin/users', sampleBody: { "username": "dev1", "password": "StrongPass123", "role": "developer" }, request: `{\n  "username": "dev1",\n  "password": "StrongPass123",\n  "role": "developer"\n}`, response: `{"id": 5}` },
+                    { id: 'adminUpdateUser', method: 'PUT', path: '/api/admin/users/{id}', title: 'Update User', summary: 'Update username or role.', auth: 'cookie', sampleUrl: '/api/admin/users/5', sampleBody: { "username": "dev2", "role": "developer" }, request: `PUT /api/admin/users/5\n{\n  "username": "dev2",\n  "role": "developer"\n}`, response: `{"status": "updated"}` },
+                    { id: 'adminDeleteUser', method: 'DELETE', path: '/api/admin/users/{id}', title: 'Delete User', summary: 'Remove a user.', auth: 'cookie', sampleUrl: '/api/admin/users/5', request: `DELETE /api/admin/users/5`, response: `{"status": "deleted"}` },
+                    { id: 'adminResetPassword', method: 'POST', path: '/api/admin/reset-password', title: 'Reset User Password', summary: 'Reset any user password.', auth: 'cookie', sampleUrl: '/api/admin/reset-password', sampleBody: { "user_id": 5, "new_password": "Reset123!" }, request: `{\n  "user_id": 5,\n  "new_password": "Reset123!"\n}`, response: `{"status": "reset"}` },
+                    { id: 'adminDisable2fa', method: 'POST', path: '/api/admin/disable-2fa', title: 'Disable 2FA for User', summary: 'Force-disable 2FA.', auth: 'cookie', sampleUrl: '/api/admin/disable-2fa', sampleBody: { "user_id": 5 }, request: `{\n  "user_id": 5\n}`, response: `{"status": "disabled"}` },
+                    { id: 'adminBots', method: 'GET', path: '/api/admin/bots', title: 'List Bots', summary: 'List all bots.', auth: 'cookie', sampleUrl: '/api/admin/bots', request: `GET /api/admin/bots`, response: `{"bots":[{"id":1,"name":"PagerDuty","token":"..."}]}` },
+                    { id: 'adminCreateBot', method: 'POST', path: '/api/admin/bots', title: 'Create Bot', summary: 'Create a bot token for webhooks.', auth: 'cookie', sampleUrl: '/api/admin/bots', sampleBody: { "name": "BuildBot" }, request: `{\n  "name": "BuildBot"\n}`, response: `{"id": 3, "token": "..."}` },
+                    { id: 'adminDeleteBot', method: 'DELETE', path: '/api/admin/bots/{id}', title: 'Delete Bot', summary: 'Remove a bot.', auth: 'cookie', sampleUrl: '/api/admin/bots/3', request: `DELETE /api/admin/bots/3`, response: `{"status": "deleted"}` },
+                    { id: 'adminChats', method: 'GET', path: '/api/admin/chats', title: 'List Chats', summary: 'Fetch all chats.', auth: 'cookie', sampleUrl: '/api/admin/chats', request: `GET /api/admin/chats`, response: `{"chats":[{"id":1,"chat_id":"general","name":"General"}]}` },
+                    { id: 'adminCreateChat', method: 'POST', path: '/api/admin/chats', title: 'Create Chat', summary: 'Create a chat bound to a bot.', auth: 'cookie', sampleUrl: '/api/admin/chats', sampleBody: { "name": "Ops", "chat_id": "ops", "bot_id": 1 }, request: `{\n  "name": "Ops",\n  "chat_id": "ops",\n  "bot_id": 1\n}`, response: `{"id": 7}` },
+                    { id: 'adminDeleteChat', method: 'DELETE', path: '/api/admin/chats/{id}', title: 'Delete Chat', summary: 'Remove a chat.', auth: 'cookie', sampleUrl: '/api/admin/chats/7', request: `DELETE /api/admin/chats/7`, response: `{"status": "deleted"}` },
+                    { id: 'adminPurge', method: 'POST', path: '/api/admin/purge', title: 'Purge Alerts', summary: 'Delete all alerts.', auth: 'cookie', sampleUrl: '/api/admin/purge', request: `POST /api/admin/purge`, response: `{"status": "purged"}` }
+                ]
+            }
+        ];
+
+        const methodColors = {
+            GET: 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30',
+            POST: 'bg-blue-500/15 text-blue-200 border border-blue-400/30',
+            PUT: 'bg-amber-500/15 text-amber-200 border border-amber-400/30',
+            PATCH: 'bg-violet-500/15 text-violet-200 border border-violet-400/30',
+            DELETE: 'bg-rose-500/15 text-rose-200 border border-rose-400/30'
+        };
+
+        let docsInitialized = false;
+        let currentApiGroup = 'public';
+        let currentApiEndpoint = 'login';
+        let sampleStatus = '';
+        let sampleBody = '';
+
+        function badgeForMethod(method) {
+            const cls = methodColors[method] || 'bg-slate-700 text-slate-100 border border-slate-500/40';
+            return `<span class="method-pill ${cls}"><span style="background: currentColor"></span>${method}</span>`;
+        }
+
+        function badgeForAuth(auth) {
+            if (auth === 'none') return '<span class="px-2 py-1 text-[11px] rounded-full bg-slate-800 text-slate-200 border border-slate-700">Public</span>';
+            return '<span class="px-2 py-1 text-[11px] rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/30">Session cookie</span>';
+        }
+
+        function renderApiNav() {
+            const nav = document.getElementById('api-nav');
+            nav.innerHTML = apiDocs.map(group => {
+                const isOpen = group.id === currentApiGroup;
+                const endpointsHtml = group.endpoints.map(ep => `
+                    <button onclick="selectEndpoint('${group.id}','${ep.id}')" class="w-full text-left px-3 py-2 rounded-lg border transition ${currentApiGroup === group.id && currentApiEndpoint === ep.id ? 'border-blue-500/40 bg-blue-500/10 text-blue-100' : 'border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-900'}">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold">${ep.method}</span>
+                            <span class="text-[10px] text-slate-500">${ep.path}</span>
+                        </div>
+                        <div class="text-sm font-medium">${ep.title}</div>
+                    </button>
+                `).join('');
+
+                return `
+                    <div class="mb-5">
+                        <div class="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">${group.title}</div>
+                        <div class="space-y-2 ${isOpen ? '' : 'opacity-80'}">${endpointsHtml}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectEndpoint(groupId, endpointId) {
+            currentApiGroup = groupId;
+            currentApiEndpoint = endpointId;
+            renderApiNav();
+            renderApiContent();
+        }
+
+        function renderApiContent() {
+            const group = apiDocs.find(g => g.id === currentApiGroup) || apiDocs[0];
+            const endpoint = group.endpoints.find(e => e.id === currentApiEndpoint) || group.endpoints[0];
+            const content = document.getElementById('api-content');
+
+            content.innerHTML = `
+                <div class="flex items-center gap-3 mb-4">
+                    ${badgeForMethod(endpoint.method)}
+                    <div>
+                        <div class="text-sm text-slate-400 uppercase tracking-wide">${group.title}</div>
+                        <div class="text-lg font-semibold text-slate-50">${endpoint.path}</div>
+                    </div>
+                </div>
+                <div class="card-ghost rounded-2xl p-5 mb-4">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="px-2 py-1 rounded-full text-[11px] bg-slate-800 text-slate-200 border border-slate-700">Endpoint</div>
+                        ${badgeForAuth(endpoint.auth)}
+                    </div>
+                    <div class="text-xl font-semibold text-slate-100 mb-1">${endpoint.title}</div>
+                    <p class="text-slate-400 leading-relaxed">${endpoint.summary}</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="card-ghost rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-sm font-semibold text-slate-200">Request</div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-[11px] text-slate-500 uppercase">Example</span>
+                                <button onclick="copyCurl()" class="px-2.5 py-1.5 text-[12px] rounded-lg border border-slate-700 text-slate-200 hover:border-slate-500 hover:text-white transition">Copy cURL</button>
+                            </div>
+                        </div>
+                        <pre class="code-block">${endpoint.request}</pre>
+                    </div>
+                    <div class="card-ghost rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-sm font-semibold text-slate-200">Response</div>
+                            <span class="text-[11px] text-slate-500 uppercase">Sample</span>
+                        </div>
+                        <pre class="code-block">${endpoint.response}</pre>
+                    </div>
+                </div>
+                <div class="card-ghost rounded-2xl p-4 mt-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-slate-200">Try it</span>
+                            <span class="text-[11px] text-slate-500">Runs sample payload against this server</span>
+                        </div>
+                        <button id="run-sample-btn" onclick="runSample()" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-semibold text-white shadow shadow-blue-900/30 disabled:opacity-50 disabled:cursor-not-allowed">Run sample</button>
+                    </div>
+                    <div id="sample-status" class="text-[12px] text-slate-400"></div>
+                    <pre id="sample-result" class="code-block whitespace-pre-wrap">${sampleBody || '// click "Run sample" to see live or simulated response'}</pre>
+                </div>
+            `;
+        }
+
+        function initApiDocs() {
+            if (docsInitialized) return;
+            renderApiNav();
+            renderApiContent();
+            docsInitialized = true;
+        }
+
+        function buildCurl(endpoint) {
+            let url = endpoint.sampleUrl || endpoint.path;
+            if (endpoint.sampleQuery && endpoint.method === 'GET') {
+                const qs = new URLSearchParams(endpoint.sampleQuery).toString();
+                url = qs ? `${url}?${qs}` : url;
+            }
+            const lines = [`curl -X ${endpoint.method} "${url}"`];
+            if (endpoint.sampleBody && endpoint.method !== 'GET') {
+                lines.push(`  -H "Content-Type: application/json" \\`);
+                lines.push(`  -d '${JSON.stringify(endpoint.sampleBody, null, 2)}'`);
+            }
+            return lines.join('\n');
+        }
+
+        function copyCurl() {
+            const group = apiDocs.find(g => g.id === currentApiGroup) || apiDocs[0];
+            const endpoint = group.endpoints.find(e => e.id === currentApiEndpoint) || group.endpoints[0];
+            const cmd = buildCurl(endpoint);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(cmd)
+                    .then(() => {
+                        const statusEl = document.getElementById('sample-status');
+                        if (statusEl) statusEl.textContent = '✅ cURL copied to clipboard';
+                    })
+                    .catch(() => alert('Copy failed. Please copy manually.'));
+            } else {
+                alert(cmd);
+            }
+        }
+
+        async function runSample() {
+            const btn = document.getElementById('run-sample-btn');
+            const statusEl = document.getElementById('sample-status');
+            const resultEl = document.getElementById('sample-result');
+            const group = apiDocs.find(g => g.id === currentApiGroup) || apiDocs[0];
+            const endpoint = group.endpoints.find(e => e.id === currentApiEndpoint) || group.endpoints[0];
+
+            if (endpoint.auth !== 'none' && !isAuthenticated) {
+                statusEl.textContent = '⚠️ Requires authenticated session (developer/admin).';
+                resultEl.textContent = '{"error": "Not authenticated"}';
+                return;
+            }
+
+            const headers = {};
+            const options = { method: endpoint.method, headers };
+            let url = endpoint.sampleUrl || endpoint.path;
+
+            if (endpoint.sampleBody && endpoint.method !== 'GET') {
+                headers['Content-Type'] = 'application/json';
+                options.body = JSON.stringify(endpoint.sampleBody);
+            }
+            if (endpoint.sampleQuery && endpoint.method === 'GET') {
+                const qs = new URLSearchParams(endpoint.sampleQuery).toString();
+                url = qs ? `${url}?${qs}` : url;
+            }
+
+            btn.disabled = true;
+            statusEl.textContent = 'Running sample...';
+            resultEl.textContent = '';
+
+            try {
+                const res = await fetch(url, options);
+                const text = await res.text();
+                const prefix = res.ok ? '✅ Success' : `⚠️ ${res.status}`;
+                statusEl.textContent = `${prefix} • ${endpoint.method} ${url}`;
+                resultEl.textContent = text || '(empty response)';
+            } catch (err) {
+                statusEl.textContent = '⚠️ Request failed (showing mock response)';
+                resultEl.textContent = typeof endpoint.response === 'string' ? endpoint.response : JSON.stringify(endpoint.response, null, 2);
+            } finally {
+                btn.disabled = false;
             }
         }
 
@@ -854,6 +1098,13 @@
                 showLoginOverlay();
                 return;
             }
+
+            const userRole = (localStorage.getItem('userRole') || '').toLowerCase();
+            const allowedDocRoles = ['admin', 'developer'];
+            if (id === 'integration' && (!isAuthenticated || !allowedDocRoles.includes(userRole))) {
+                alert('API docs are available to developer/admin users only.');
+                return;
+            }
             
             currentChannelId = id;
             
@@ -870,12 +1121,13 @@
             const integrationGuide = document.getElementById('integration-guide');
 
             if (id === 'integration') {
-                headerTitle.textContent = "Integration Guide";
+                headerTitle.textContent = "API Integration";
                 headerIcon.style.display = 'none';
                 testBtn.style.display = 'none';
                 msgsContainer.style.display = 'none';
                 emptyState.style.display = 'none';
                 integrationGuide.style.display = 'block';
+                setTimeout(initApiDocs, 50);
             } else {
                 const ch = channels.find(c => c.id === id);
                 headerTitle.textContent = ch ? ch.name : 'Unknown';

@@ -1,0 +1,393 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Sentinel Incident Viewer API",
+    "description": "Interactive API guide for Sentinel. Public endpoints are open; internal endpoints require an authenticated session (developer/admin).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current server"
+    }
+  ],
+  "tags": [
+    { "name": "Public", "description": "Endpoints usable without authentication" },
+    { "name": "User", "description": "Authenticated user endpoints" },
+    { "name": "Admin", "description": "Developer/admin-only endpoints" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session",
+        "description": "Session cookie set after login"
+      }
+    },
+    "schemas": {
+      "Alert": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "message": { "type": "string" },
+          "level": { "type": "string", "enum": ["info", "warning", "error", "critical", "success"] },
+          "source": { "type": "string" }
+        },
+        "required": ["title", "message"]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "username": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "developer", "user"] },
+          "totp_enabled": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/login": {
+      "post": {
+        "tags": ["Public"],
+        "summary": "Login",
+        "description": "Login and establish a session cookie.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string" },
+                  "password": { "type": "string" }
+                },
+                "required": ["username", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Logged in (may require 2FA)" },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/login/verify-2fa": {
+      "post": {
+        "tags": ["Public"],
+        "summary": "Verify 2FA",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": { "type": "integer" },
+                  "code": { "type": "string" }
+                },
+                "required": ["user_id", "code"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "2FA verified" }, "401": { "description": "Invalid code" } }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": ["Public"],
+        "summary": "Search alerts",
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string" } },
+          { "name": "level", "in": "query", "schema": { "type": "string" } },
+          { "name": "source", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Search results" } }
+      }
+    },
+    "/api/chats": {
+      "get": {
+        "tags": ["Public"],
+        "summary": "List chats (public view)",
+        "responses": { "200": { "description": "List of chats" } }
+      }
+    },
+    "/api/push/vapid-public-key": {
+      "get": {
+        "tags": ["Public"],
+        "summary": "Get VAPID public key",
+        "responses": { "200": { "description": "Key" } }
+      }
+    },
+    "/api/push/subscribe": {
+      "post": {
+        "tags": ["Public"],
+        "summary": "Subscribe to push",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object" } } }
+        },
+        "responses": { "200": { "description": "Subscribed" } }
+      }
+    },
+    "/webhook": {
+      "post": {
+        "tags": ["Public"],
+        "summary": "Generic webhook",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Alert" } } }
+        },
+        "responses": { "200": { "description": "Alert created" } }
+      }
+    },
+    "/api/slack/webhook": {
+      "post": {
+        "tags": ["Public"],
+        "summary": "Slack-compatible webhook",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "200": { "description": "Alert created" } }
+      }
+    },
+    "/api/discord/webhook": {
+      "post": {
+        "tags": ["Public"],
+        "summary": "Discord-compatible webhook",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "200": { "description": "Alert created" } }
+      }
+    },
+    "/bot/{token}": {
+      "post": {
+        "tags": ["Public"],
+        "summary": "Bot webhook (token keyed)",
+        "parameters": [{ "name": "token", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Alert" } } }
+        },
+        "responses": { "200": { "description": "Alert created" }, "404": { "description": "Invalid token" } }
+      }
+    },
+    "/api/user/me": {
+      "get": {
+        "tags": ["User"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Current user",
+        "responses": { "200": { "description": "User info", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } } }
+      }
+    },
+    "/api/user/profile": {
+      "put": {
+        "tags": ["User"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Update profile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/api/user/change-password": {
+      "post": {
+        "tags": ["User"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Change password",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "current_password": { "type": "string" },
+                  "new_password": { "type": "string" }
+                },
+                "required": ["current_password", "new_password"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Changed" }, "400": { "description": "Validation error" } }
+      }
+    },
+    "/api/user/2fa/generate": {
+      "post": {
+        "tags": ["User"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Generate 2FA secret",
+        "responses": { "200": { "description": "Secret generated" } }
+      }
+    },
+    "/api/user/2fa/enable": {
+      "post": {
+        "tags": ["User"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Enable 2FA",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "code": { "type": "string" } }, "required": ["code"] } } }
+        },
+        "responses": { "200": { "description": "Enabled" }, "400": { "description": "Invalid code" } }
+      }
+    },
+    "/api/user/2fa/disable": {
+      "post": {
+        "tags": ["User"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Disable 2FA",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "user_id": { "type": "integer" } }, "required": ["user_id"] } } }
+        },
+        "responses": { "200": { "description": "Disabled" } }
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "List users"
+      },
+      "post": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Create user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string" },
+                  "password": { "type": "string" },
+                  "role": { "type": "string", "enum": ["admin", "developer", "user"] }
+                },
+                "required": ["username", "password", "role"]
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/api/admin/users/{id}": {
+      "put": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Update user",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "username": { "type": "string" }, "role": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "Updated" } }
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Delete user",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "204": { "description": "Deleted" } }
+      }
+    },
+    "/api/admin/reset-password": {
+      "post": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Reset user password",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "user_id": { "type": "integer" }, "new_password": { "type": "string" } }, "required": ["user_id", "new_password"] } } }
+        },
+        "responses": { "200": { "description": "Reset" } }
+      }
+    },
+    "/api/admin/disable-2fa": {
+      "post": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Disable user 2FA",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "user_id": { "type": "integer" } }, "required": ["user_id"] } } }
+        },
+        "responses": { "200": { "description": "Disabled" } }
+      }
+    },
+    "/api/admin/bots": {
+      "get": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "List bots"
+      },
+      "post": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Create bot",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] } } }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/api/admin/bots/{id}": {
+      "delete": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Delete bot",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "204": { "description": "Deleted" } }
+      }
+    },
+    "/api/admin/chats": {
+      "get": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "List chats"
+      },
+      "post": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Create chat",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "name": { "type": "string" }, "chat_id": { "type": "string" }, "bot_id": { "type": "integer" } }, "required": ["name", "chat_id"] } } }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/api/admin/chats/{id}": {
+      "delete": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Delete chat",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "204": { "description": "Deleted" } }
+      }
+    },
+    "/api/admin/purge": {
+      "post": {
+        "tags": ["Admin"],
+        "security": [{ "cookieAuth": [] }],
+        "summary": "Purge all alerts",
+        "responses": { "200": { "description": "Purged" } }
+      }
+    }
+  }
+}
