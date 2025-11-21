@@ -43,6 +43,28 @@ A real-time incident alert viewer and management system built with Go, PostgreSQ
 - **Frontend**: HTML5, Vanilla JavaScript, Tailwind CSS, Service Workers (PWA)
 - **Containerization**: Docker & Docker Compose
 
+## Architecture
+
+```mermaid
+graph TD
+    User[User / Browser] -->|HTTP/WebSocket| App[Go Application]
+    User -->|Push API| SW[Service Worker]
+    
+    subgraph Backend
+        App -->|Store Data| DB[(PostgreSQL)]
+        App -->|Pub/Sub & Cache| Redis[(Redis)]
+    end
+    
+    subgraph External
+        Prometheus[Prometheus/Grafana] -->|Webhook| App
+        Telegram[Telegram Bot] -->|Webhook| App
+    end
+    
+    Redis -->|Alert Event| App
+    App -->|SSE Update| User
+    App -->|WebPush| SW
+```
+
 ## Getting Started
 
 ### Prerequisites
