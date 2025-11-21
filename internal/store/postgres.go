@@ -428,3 +428,36 @@ func (s *PostgresStore) GetChatUsers(ctx context.Context, chatID int) ([]models.
 
 	return users, nil
 }
+
+// Push Notification methods
+
+func (s *PostgresStore) SavePushSubscription(ctx context.Context, userID int, endpoint, p256dh, auth string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at)
+		 VALUES ($1, $2, $3, $4, NOW())
+		 ON CONFLICT (endpoint) DO UPDATE 
+		 SET user_id = $1, p256dh = $3, auth = $4, created_at = NOW()`,
+		userID, endpoint, p256dh, auth,
+	)
+	return err
+}
+
+func (s *PostgresStore) GetPushSubscriptions(ctx context.Context) ([]models.PushSubscription, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, user_id, endpoint, p256dh, auth, created_at FROM push_subscriptions`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []models.PushSubscription
+	for rows.Next() {
+		var sub models.PushSubscription
+		if err := rows.Scan(&sub.ID, &sub.UserID, &sub.Endpoint, &sub.P256dh, &sub.Auth, &sub.CreatedAt); err != nil {
+			continue
+		}
+		subs = append(subs, sub)
+	}
+	return subs, nil
+}

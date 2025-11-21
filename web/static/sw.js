@@ -1,28 +1,47 @@
-const CACHE_NAME = 'incident-viewer-v1';
-const urlsToCache = [
-  '/',
-  '/static/manifest.json'
-];
+self.addEventListener('push', function (event) {
+  let body = 'New Incident Alert!';
+  if (event.data) {
+    body = event.data.text();
+  }
 
-self.addEventListener('install', event => {
+  const options = {
+    body: body,
+    icon: '/static/icon.png', // Ensure this icon exists or use a placeholder
+    badge: '/static/badge.png',
+    vibrate: [100, 50, 100],
+    data: {
+      dateOfArrival: Date.now(),
+      primaryKey: 1
+    },
+    actions: [
+      { action: 'explore', title: 'View Alert', icon: '/static/checkmark.png' },
+      { action: 'close', title: 'Close', icon: '/static/xmark.png' },
+    ]
+  };
+
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
+    self.registration.showNotification('Sentinel Ops', options)
   );
 });
 
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Cache hit - return response
-        if (response) {
-          return response;
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+
+  if (event.action === 'close') {
+    return;
+  }
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (client.url === '/' && 'focus' in client) {
+          return client.focus();
         }
-        return fetch(event.request);
-      })
+      }
+      if (clients.openWindow) {
+        return clients.openWindow('/');
+      }
+    })
   );
 });

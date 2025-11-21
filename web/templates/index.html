@@ -128,6 +128,20 @@
                                 Setup
                             </button>
                         </div>
+
+                        <!-- Push Notifications -->
+                        <div class="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg border border-slate-600/50">
+                            <div class="flex items-center space-x-3">
+                                <i data-lucide="bell" class="w-4 h-4 text-slate-400"></i>
+                                <div>
+                                    <div class="text-sm font-medium">Push Notifications</div>
+                                    <div id="profile-push-status" class="text-xs text-slate-500">Disabled</div>
+                                </div>
+                            </div>
+                            <button id="btn-toggle-push" onclick="togglePushNotifications()" class="text-xs font-bold px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white">
+                                Enable
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -993,6 +1007,96 @@
                     source: 'ui-test'
                 })
             }).catch(console.error);
+        }
+
+        // --- Push Notifications ---
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js').then(function(reg) {
+                console.log('Service Worker Registered');
+                checkPushSubscription();
+            });
+        }
+
+        async function checkPushSubscription() {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            updatePushUI(!!sub);
+        }
+
+        function updatePushUI(enabled) {
+            const statusEl = document.getElementById('profile-push-status');
+            const btnEl = document.getElementById('btn-toggle-push');
+            if (!statusEl || !btnEl) return;
+
+            if (enabled) {
+                statusEl.textContent = 'Enabled ✅';
+                statusEl.className = 'text-xs text-emerald-400 font-bold';
+                btnEl.textContent = 'Active'; 
+                btnEl.disabled = true;
+                btnEl.className = 'text-xs font-bold px-3 py-1.5 rounded bg-slate-700 text-slate-400 cursor-default';
+            } else {
+                statusEl.textContent = 'Disabled';
+                statusEl.className = 'text-xs text-slate-500';
+                btnEl.textContent = 'Enable';
+                btnEl.disabled = false;
+                btnEl.className = 'text-xs font-bold px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white';
+            }
+        }
+
+        async function togglePushNotifications() {
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                const sub = await reg.pushManager.getSubscription();
+                if (sub) return;
+
+                // Request permission
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    alert('Permission denied');
+                    return;
+                }
+
+                // Get VAPID key
+                const res = await fetch('/api/push/vapid-public-key');
+                const data = await res.json();
+                const publicKey = data.publicKey;
+
+                // Subscribe
+                const newSub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicKey)
+                });
+
+                // Send to backend
+                await fetch('/api/push/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newSub)
+                });
+
+                alert('Push Notifications Enabled! 🚀');
+                updatePushUI(true);
+
+            } catch (err) {
+                console.error('Failed to subscribe', err);
+                alert('Failed to enable notifications: ' + err.message);
+            }
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/\-/g, '+')
+                .replace(/_/g, '/');
+
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
         }
     </script>
 </body>

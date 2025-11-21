@@ -44,3 +44,15 @@ CREATE INDEX IF NOT EXISTS idx_user_chat_permissions_user ON user_chat_permissio
 CREATE INDEX IF NOT EXISTS idx_user_chat_permissions_chat ON user_chat_permissions(chat_id);
 
 CREATE INDEX IF NOT EXISTS idx_chats_bot_id ON chats(bot_id);
+
+-- Push Subscriptions table
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);

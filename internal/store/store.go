@@ -62,6 +62,10 @@ type AdminStore interface {
 	RemoveChatFromUser(ctx context.Context, userID, chatID int) error
 	GetUserChats(ctx context.Context, userID int) ([]models.Chat, error)
 	GetChatUsers(ctx context.Context, chatID int) ([]models.User, error)
+
+	// Push Notification methods
+	SavePushSubscription(ctx context.Context, userID int, endpoint, p256dh, auth string) error
+	GetPushSubscriptions(ctx context.Context) ([]models.PushSubscription, error)
 }
 
 type RedisStore struct {

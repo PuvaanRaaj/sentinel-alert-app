@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -13,6 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"incident-viewer-go/internal/handlers"
+	"incident-viewer-go/internal/models"
 	"incident-viewer-go/internal/store"
 )
 
@@ -195,6 +198,26 @@ func main() {
 
 	// Bot webhook (public)
 	http.HandleFunc("/bot/", h.BotWebhookHandler)
+
+	// Push Notification routes
+	http.HandleFunc("/api/push/vapid-public-key", h.GetVAPIDKeyHandler)
+	http.HandleFunc("/api/push/subscribe", h.SubscribePushHandler)
+
+	// Start background listener for push notifications
+	go func() {
+		pubsub := redisStore.Subscribe(context.Background())
+		defer pubsub.Close()
+		ch := pubsub.Channel()
+
+		for msg := range ch {
+			var alert models.Alert
+			if err := json.Unmarshal([]byte(msg.Payload), &alert); err == nil {
+				h.SendPushNotification(fmt.Sprintf("🚨 %s: %s", alert.Title, alert.Message))
+			} else {
+				h.SendPushNotification("New Incident Alert Received!")
+			}
+		}
+	}()
 
 	// Serve static files (PWA assets)
 	fs := http.FileServer(http.Dir("web/static"))
