@@ -10,6 +10,9 @@ A real-time incident alert viewer and management system built with Go, PostgreSQ
 |:---:|:---:|:---:|
 | ![Dashboard](screenshots/dashboard.png) | ![User Profile](screenshots/user_profile.png) | ![Mobile View](screenshots/mobile_view.png) |
 
+
+![2FA](2fa.png)
+
 ## Features
 
 ### 🚀 Real-Time Monitoring
