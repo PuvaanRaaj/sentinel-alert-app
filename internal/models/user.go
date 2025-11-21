@@ -7,11 +7,14 @@ import (
 )
 
 type User struct {
-	ID           int       `json:"id"`
-	Username     string    `json:"username"`
-	PasswordHash string    `json:"-"`
-	Role         string    `json:"role"` // "admin" or "user"
-	CreatedAt    time.Time `json:"created_at"`
+	ID                 int       `json:"id"`
+	Username           string    `json:"username"`
+	PasswordHash       string    `json:"-"`
+	Role               string    `json:"role"` // "admin" or "user"
+	TOTPSecret         string    `json:"-"`
+	TOTPEnabled        bool      `json:"totp_enabled"`
+	LastPasswordChange time.Time `json:"last_password_change,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 // HashPassword generates bcrypt hash of the password

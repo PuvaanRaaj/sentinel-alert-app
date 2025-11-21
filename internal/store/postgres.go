@@ -64,9 +64,9 @@ func (s *PostgresStore) CreateUser(ctx context.Context, username, password, role
 func (s *PostgresStore) GetUser(ctx context.Context, id int) (models.User, error) {
 	var user models.User
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, username, password_hash, role, created_at FROM users WHERE id = $1`,
+		`SELECT id, username, password_hash, role, totp_secret, totp_enabled, last_password_change, created_at FROM users WHERE id = $1`,
 		id,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.TOTPSecret, &user.TOTPEnabled, &user.LastPasswordChange, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return models.User{}, errors.New("user not found")
@@ -77,9 +77,9 @@ func (s *PostgresStore) GetUser(ctx context.Context, id int) (models.User, error
 func (s *PostgresStore) GetUserByUsername(ctx context.Context, username string) (models.User, error) {
 	var user models.User
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, username, password_hash, role, created_at FROM users WHERE username = $1`,
+		`SELECT id, username, password_hash, role, totp_secret, totp_enabled, last_password_change, created_at FROM users WHERE username = $1`,
 		username,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.TOTPSecret, &user.TOTPEnabled, &user.LastPasswordChange, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return models.User{}, errors.New("user not found")
@@ -89,7 +89,7 @@ func (s *PostgresStore) GetUserByUsername(ctx context.Context, username string) 
 
 func (s *PostgresStore) GetUsers(ctx context.Context) ([]models.User, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, username, password_hash, role, created_at FROM users ORDER BY created_at DESC`,
+		`SELECT id, username, password_hash, role, totp_secret, totp_enabled, last_password_change, created_at FROM users ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func (s *PostgresStore) GetUsers(ctx context.Context) ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.TOTPSecret, &user.TOTPEnabled, &user.LastPasswordChange, &user.CreatedAt); err != nil {
 			continue
 		}
 		users = append(users, user)
@@ -127,6 +127,51 @@ func (s *PostgresStore) UpdateUser(ctx context.Context, id int, username, role s
 
 func (s *PostgresStore) DeleteUser(ctx context.Context, id int) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, id)
+	return err
+}
+
+// User profile & password management
+
+func (s *PostgresStore) UpdateUserPassword(ctx context.Context, userID int, newPasswordHash string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET password_hash = $1, last_password_change = NOW() WHERE id = $2`,
+		newPasswordHash, userID,
+	)
+	return err
+}
+
+func (s *PostgresStore) UpdateUserProfile(ctx context.Context, userID int, username string) error {
+	result, err := s.db.ExecContext(ctx,
+		`UPDATE users SET username = $1 WHERE id = $2`,
+		username, userID,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return errors.New("user not found")
+	}
+
+	return nil
+}
+
+// 2FA methods
+
+func (s *PostgresStore) UpdateUser2FA(ctx context.Context, userID int, totpSecret string, enabled bool) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET totp_secret = $1, totp_enabled = $2 WHERE id = $3`,
+		totpSecret, enabled, userID,
+	)
+	return err
+}
+
+func (s *PostgresStore) Disable2FA(ctx context.Context, userID int) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET totp_secret = NULL, totp_enabled = FALSE WHERE id = $1`,
+		userID,
+	)
 	return err
 }
 

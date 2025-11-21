@@ -39,6 +39,17 @@ func (h *Handler) PublicLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if 2FA is enabled
+	if user.TOTPEnabled {
+		// Return 2FA required response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"requires_2fa": true,
+			"user_id":      user.ID,
+		})
+		return
+	}
+
 	// Get user's allowed chats
 	var allowedChats []any
 	if user.Role == "admin" {

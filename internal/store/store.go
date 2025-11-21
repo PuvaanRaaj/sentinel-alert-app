@@ -36,6 +36,14 @@ type AdminStore interface {
 	UpdateUser(ctx context.Context, id int, username, role string) error
 	DeleteUser(ctx context.Context, id int) error
 
+	// User profile & password management
+	UpdateUserPassword(ctx context.Context, userID int, newPasswordHash string) error
+	UpdateUserProfile(ctx context.Context, userID int, username string) error
+
+	// 2FA methods
+	UpdateUser2FA(ctx context.Context, userID int, totpSecret string, enabled bool) error
+	Disable2FA(ctx context.Context, userID int) error
+
 	// Bot methods
 	CreateBot(ctx context.Context, name string, createdBy int) (models.Bot, error)
 	GetBot(ctx context.Context, id int) (models.Bot, error)

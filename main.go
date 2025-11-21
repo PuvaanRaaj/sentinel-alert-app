@@ -172,6 +172,21 @@ func main() {
 	})))
 	http.HandleFunc("/api/admin/purge", handlers.AuthMiddleware(handlers.AdminMiddleware(h.PurgeAlertsHandler)))
 
+	// User management routes
+	http.HandleFunc("/api/user/profile", h.UpdateProfileHandler)
+	http.HandleFunc("/api/user/change-password", h.ChangePasswordHandler)
+	http.HandleFunc("/api/user/me", h.GetCurrentUserHandler)
+
+	// Admin user management
+	http.HandleFunc("/api/admin/reset-password", handlers.AuthMiddleware(handlers.AdminMiddleware(h.AdminResetPasswordHandler)))
+
+	// 2FA routes
+	http.HandleFunc("/api/user/2fa/generate", h.Generate2FAHandler)
+	http.HandleFunc("/api/user/2fa/enable", h.Enable2FAHandler)
+	http.HandleFunc("/api/user/2fa/disable", h.Disable2FAHandler)
+	http.HandleFunc("/api/login/verify-2fa", h.Verify2FALoginHandler)
+	http.HandleFunc("/api/admin/disable-2fa", handlers.AuthMiddleware(handlers.AdminMiddleware(h.AdminDisable2FAHandler)))
+
 	// Bot webhook (public)
 	http.HandleFunc("/bot/", h.BotWebhookHandler)
 
