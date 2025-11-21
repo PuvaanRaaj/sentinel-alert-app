@@ -22,6 +22,7 @@ type AlertStore interface {
 	GetAlerts(ctx context.Context) ([]models.Alert, error)
 	SearchAlerts(ctx context.Context, query, level, source string) ([]models.Alert, error)
 	ClearAlerts(ctx context.Context) error
+	PurgeAllAlerts(ctx context.Context) error
 	Subscribe(ctx context.Context) *redis.PubSub
 }
 
@@ -207,13 +208,22 @@ func (s *RedisStore) SearchAlerts(ctx context.Context, query, level, source stri
 }
 
 func (s *RedisStore) ClearAlerts(ctx context.Context) error {
-	// Get all keys
-	keys, err := s.client.ZRange(ctx, "alerts:timeline", 0, -1).Result()
-	if err != nil {
+	return s.client.Del(ctx, "alerts").Err()
+}
+
+func (s *RedisStore) PurgeAllAlerts(ctx context.Context) error {
+	// Delete all keys matching alert:*
+	iter := s.client.Scan(ctx, 0, "alert:*", 0).Iterator()
+	keys := []string{}
+
+	for iter.Next(ctx) {
+		keys = append(keys, iter.Val())
+	}
+
+	if err := iter.Err(); err != nil {
 		return err
 	}
 
-	// Delete all alert keys
 	if len(keys) > 0 {
 		s.client.Del(ctx, keys...)
 	}
@@ -222,14 +232,28 @@ func (s *RedisStore) ClearAlerts(ctx context.Context) error {
 	s.client.Del(ctx, "alerts:timeline")
 
 	// Clear index sets (use SCAN to find them)
-	iter := s.client.Scan(ctx, 0, "alerts:level:*", 0).Iterator()
+	iter = s.client.Scan(ctx, 0, "alerts:level:*", 0).Iterator()
+	indexKeys := []string{}
 	for iter.Next(ctx) {
-		s.client.Del(ctx, iter.Val())
+		indexKeys = append(indexKeys, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		return err
+	}
+	if len(indexKeys) > 0 {
+		s.client.Del(ctx, indexKeys...)
 	}
 
 	iter = s.client.Scan(ctx, 0, "alerts:source:*", 0).Iterator()
+	sourceKeys := []string{}
 	for iter.Next(ctx) {
-		s.client.Del(ctx, iter.Val())
+		sourceKeys = append(sourceKeys, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		return err
+	}
+	if len(sourceKeys) > 0 {
+		s.client.Del(ctx, sourceKeys...)
 	}
 
 	return nil

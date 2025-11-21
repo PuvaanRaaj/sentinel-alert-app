@@ -20,6 +20,36 @@
 </head>
 <body class="bg-[#0f172a] text-slate-200 font-sans h-screen overflow-hidden flex">
 
+    <!-- Login Overlay (shows when trying to access protected chats) -->
+    <div id="login-overlay" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4 border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold flex items-center">
+                    <i data-lucide="lock" class="w-6 h-6 mr-2 text-blue-500"></i>
+                    Login Required
+                </h2>
+                <button onclick="hideLoginOverlay()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p class="text-slate-400 mb-6">Please login to access custom chat channels</p>
+            <form onsubmit="login(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Username</label>
+                    <input type="text" id="login-username" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter username" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Password</label>
+                    <input type="password" id="login-password" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter password" />
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-semibold transition-all">
+                    Login
+                </button>
+            </form>
+            <div id="login-error" class="hidden mt-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm"></div>
+        </div>
+    </div>
+
     <!-- Sidebar -->
     <div class="w-72 bg-[#0B1120] border-r border-slate-800 flex flex-col flex-shrink-0 z-20 shadow-xl">
         <div class="h-16 px-6 border-b border-slate-800 flex items-center space-x-3 bg-[#0B1120]">
@@ -79,6 +109,15 @@
                 <i data-lucide="send" class="w-3.5 h-3.5"></i>
                 <span>Test Alert</span>
             </button>
+
+            <!-- User Profile Button -->
+            <div id="user-profile" class="hidden flex items-center space-x-2 ml-4">
+                <span id="user-name" class="text-sm text-slate-400"></span>
+                <button onclick="logout()" class="flex items-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all">
+                    <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
         </div>
 
         <!-- Messages Area -->
@@ -142,7 +181,102 @@
     </div>
 
     <script>
+        // --- Authentication State ---
+        let isAuthenticated = false;
+        let currentUser = null;
+
+        // Check session on load
+        function checkAuth() {
+            const userId = localStorage.getItem('userId');
+            const username = localStorage.getItem('username');
+            if (userId && username) {
+                isAuthenticated = true;
+                currentUser = { id: parseInt(userId), username };
+                document.getElementById('user-profile').classList.remove('hidden');
+                document.getElementById('user-name').textContent = username;
+                lucide.createIcons();
+            }
+        }
+
+        // --- Authentication Functions ---
+        
+        function showLoginOverlay() {
+            document.getElementById('login-overlay').classList.remove('hidden');
+            document.getElementById('login-error').classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        function hideLoginOverlay() {
+            document.getElementById('login-overlay').classList.add('hidden');
+            document.getElementById('login-username').value = '';
+            document.getElementById('login-password').value = '';
+            document.getElementById('login-error').classList.add('hidden');
+        }
+
+        async function login(e) {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                if (res.ok) {
+                    // Store session
+                    const data = await res.json();
+                    if (data.user) {
+                        localStorage.setItem('userId', data.user.id);
+                        localStorage.setItem('username', data.user.username);
+                        localStorage.setItem('userRole', data.user.role);
+                        isAuthenticated = true;
+                        currentUser = data.user;
+                        
+                        // Update UI
+                        document.getElementById('user-profile').classList.remove('hidden');
+                        document.getElementById('user-name').textContent = data.user.username;
+                        hideLoginOverlay();
+                        renderChannels(); // Refresh to remove locks
+                        lucide.createIcons();
+                    }
+                } else {
+                    const errorDiv = document.getElementById('login-error');
+                    errorDiv.textContent = 'Invalid username or password';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('Login error:', err);
+                const errorDiv = document.getElementById('login-error');
+                errorDiv.textContent = 'Error: ' + err.message;
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                // Clear session
+                localStorage.removeItem('userId');
+                localStorage.removeItem('username');
+                isAuthenticated = false;
+                currentUser = null;
+                
+                // Update UI
+                document.getElementById('user-profile').classList.add('hidden');
+                
+                // Switch to general if on a protected channel
+                if (currentChannelId !== 'general' && currentChannelId !== 'integration') {
+                    switchChannel('general');
+                } else {
+                    renderChannels(); // Refresh to show locks
+                }
+            }
+        }
+
         // --- State ---
+        checkAuth(); // Check authentication on load
         let channels = [
             { id: 'general', name: 'General', icon: 'hash' }
         ];
@@ -248,17 +382,30 @@
 
         function renderChannels() {
             const container = document.getElementById('channel-list');
-            container.innerHTML = channels.map(ch => `
+            container.innerHTML = channels.map(ch => {
+                const isProtected = ch.id !== 'general';
+                const isLocked = isProtected && !isAuthenticated;
+                
+                return `
                 <button onclick="switchChannel('${ch.id}')" 
-                    class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${currentChannelId === ch.id ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}">
-                    <i data-lucide="${ch.icon || 'hash'}" class="w-4 h-4 opacity-70 ${currentChannelId === ch.id ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}"></i>
-                    <span class="font-medium text-sm">${ch.name}</span>
+                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group ${currentChannelId === ch.id ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}">
+                    <div class="flex items-center space-x-3">
+                        <i data-lucide="${ch.icon || 'hash'}" class="w-4 h-4 opacity-70 ${currentChannelId === ch.id ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}"></i>
+                        <span class="font-medium text-sm">${ch.name}</span>
+                    </div>
+                    ${isLocked ? '<i data-lucide="lock" class="w-3.5 h-3.5 text-slate-500"></i>' : ''}
                 </button>
-            `).join('');
+            `}).join('');
             lucide.createIcons();
         }
 
         function switchChannel(id) {
+            // Check authentication for non-general channels
+            if (id !== 'general' && id !== 'integration' && !isAuthenticated) {
+                showLoginOverlay();
+                return;
+            }
+            
             currentChannelId = id;
             
             // Update UI state

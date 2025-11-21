@@ -33,6 +33,7 @@
             <button onclick="switchTab('users')" id="tab-users" class="px-6 py-3 border-b-2 border-blue-500 text-blue-400 font-medium">Users</button>
             <button onclick="switchTab('bots')" id="tab-bots" class="px-6 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">Bots</button>
             <button onclick="switchTab('chats')" id="tab-chats" class="px-6 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">Chats</button>
+            <button onclick="switchTab('system')" id="tab-system" class="px-6 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">System</button>
         </div>
     </div>
 
@@ -72,6 +73,23 @@
                 </button>
             </div>
             <div id="chats-list" class="space-y-3"></div>
+        </div>
+
+        <!-- System Panel -->
+        <div id="panel-system" class="hidden max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-6">System Management</h2>
+            
+            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+                <h3 class="text-lg font-semibold mb-3 flex items-center">
+                    <i data-lucide="alert-triangle" class="w-5 h-5 mr-2 text-yellow-500"></i>
+                    Alert Management
+                </h3>
+                <p class="text-slate-400 mb-4">Delete all alerts from the system. This action cannot be undone.</p>
+                <button onclick="purgeAlerts()" class="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg flex items-center space-x-2">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <span>Purge All Alerts</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -157,7 +175,7 @@
 
         function switchTab(tab) {
             currentTab = tab;
-            ['users', 'bots', 'chats'].forEach(t => {
+            ['users', 'bots', 'chats', 'system'].forEach(t => {
                 document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
                 const btn = document.getElementById(`tab-${t}`);
                 if (t === tab) {
@@ -170,6 +188,7 @@
             if (tab === 'users') loadUsers();
             if (tab === 'bots') loadBots();
             if (tab === 'chats') loadChats();
+            if (tab === 'system') lucide.createIcons(); // Refresh icons for system panel
         }
 
         function showModal(title, content) {
@@ -286,6 +305,24 @@
             if (!confirm('Delete this chat?')) return;
             await fetch(`/api/admin/chats/${id}`, { method: 'DELETE' });
             loadChats();
+        }
+
+        async function purgeAlerts() {
+            if (!confirm('⚠️ Are you sure you want to delete ALL alerts?\n\nThis action cannot be undone!')) {
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/admin/purge', { method: 'POST' });
+                if (res.ok) {
+                    alert('✅ All alerts purged successfully');
+                } else {
+                    alert('❌ Failed to purge alerts');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('❌ Error: ' + err.message);
+            }
         }
 
         // Initialize

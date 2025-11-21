@@ -96,6 +96,7 @@ func main() {
 	http.HandleFunc("/telegram/", h.TelegramHandler)
 	http.HandleFunc("/clear", h.ClearHandler)
 	http.HandleFunc("/events", h.SSEHandler)
+	http.HandleFunc("/api/login", h.PublicLoginHandler)
 	http.HandleFunc("/api/search", h.SearchHandler)
 	http.HandleFunc("/api/chats", h.GetChatsPublicHandler)
 
@@ -169,6 +170,7 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})))
+	http.HandleFunc("/api/admin/purge", handlers.AuthMiddleware(handlers.AdminMiddleware(h.PurgeAlertsHandler)))
 
 	// Bot webhook (public)
 	http.HandleFunc("/bot/", h.BotWebhookHandler)
