@@ -2,6 +2,10 @@
 
 A real-time incident alert viewer and management system built with Go, PostgreSQL, and Redis.
 
+![alt text](dashboard.png)
+
+
+
 ## Features
 
 ### 🚀 Real-Time Monitoring
