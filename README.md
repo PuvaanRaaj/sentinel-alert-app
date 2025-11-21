@@ -50,6 +50,10 @@ A real-time incident alert viewer and management system built with Go, PostgreSQ
 - **Frontend**: HTML5, Vanilla JavaScript, Tailwind CSS, Service Workers (PWA)
 - **Containerization**: Docker & Docker Compose
 
+## Database Schema
+
+![Database schema](screenshots/db-schema.svg)
+
 ## Architecture
 
 ```mermaid

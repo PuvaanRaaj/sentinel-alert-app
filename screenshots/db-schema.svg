@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">Incident Viewer - Database Schema</title>
+  <desc id="desc">Tables for users, bots, chats, push subscriptions, and user chat permissions with their relationships.</desc>
+  <defs>
+    <style>
+      .bg { fill: #0f1115; }
+      .table { fill: #1a1d24; stroke: #2f333d; stroke-width: 2; rx: 10; ry: 10; }
+      .title { fill: #e7ecf3; font: 700 16px "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+      .column { fill: #cbd5e1; font: 400 14px "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+      .note { fill: #8a94a6; font: 12px "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+      .link { stroke: #5c6bff; stroke-width: 2; }
+      .dot { fill: #5c6bff; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1400" height="900" />
+
+  <!-- push_subscriptions -->
+  <rect class="table" x="80" y="120" width="280" height="220" />
+  <text class="title" x="100" y="145">push_subscriptions</text>
+  <text class="column" x="100" y="175">id (pk, int4)</text>
+  <text class="column" x="100" y="200">user_id (fk → users.id)</text>
+  <text class="column" x="100" y="225">endpoint (text)</text>
+  <text class="column" x="100" y="250">p256dh (text)</text>
+  <text class="column" x="100" y="275">auth (text)</text>
+  <text class="column" x="100" y="300">created_at (timestamptz)</text>
+
+  <!-- user_chat_permissions -->
+  <rect class="table" x="80" y="400" width="280" height="170" />
+  <text class="title" x="100" y="425">user_chat_permissions</text>
+  <text class="column" x="100" y="455">user_id (fk → users.id)</text>
+  <text class="column" x="100" y="480">chat_id (fk → chats.id)</text>
+  <text class="column" x="100" y="505">created_at (timestamp)</text>
+
+  <!-- chats -->
+  <rect class="table" x="520" y="200" width="260" height="180" />
+  <text class="title" x="540" y="225">chats</text>
+  <text class="column" x="540" y="255">id (pk, int4)</text>
+  <text class="column" x="540" y="280">chat_id (varchar)</text>
+  <text class="column" x="540" y="305">name (varchar)</text>
+  <text class="column" x="540" y="330">bot_id (fk → bots.id)</text>
+  <text class="column" x="540" y="355">created_at (timestamptz)</text>
+
+  <!-- bots -->
+  <rect class="table" x="900" y="200" width="260" height="170" />
+  <text class="title" x="920" y="225">bots</text>
+  <text class="column" x="920" y="255">id (pk, int4)</text>
+  <text class="column" x="920" y="280">token (varchar)</text>
+  <text class="column" x="920" y="305">name (varchar)</text>
+  <text class="column" x="920" y="330">created_by (fk → users.id)</text>
+  <text class="column" x="920" y="355">created_at (timestamptz)</text>
+
+  <!-- users -->
+  <rect class="table" x="900" y="440" width="260" height="210" />
+  <text class="title" x="920" y="465">users</text>
+  <text class="column" x="920" y="495">id (pk, int4)</text>
+  <text class="column" x="920" y="520">username (varchar)</text>
+  <text class="column" x="920" y="545">password_hash (varchar)</text>
+  <text class="column" x="920" y="570">role (varchar)</text>
+  <text class="column" x="920" y="595">created_at (timestamptz)</text>
+  <text class="column" x="920" y="620">totp_secret (varchar)</text>
+  <text class="column" x="920" y="645">totp_enabled (bool)</text>
+  <text class="column" x="920" y="670">last_password_change (timestamptz)</text>
+
+  <!-- Relationships -->
+  <line class="link" x1="360" y1="210" x2="520" y2="260" />
+  <circle class="dot" cx="360" cy="210" r="4" />
+  <circle class="dot" cx="520" cy="260" r="4" />
+  <text class="note" x="390" y="235">push_subscriptions.user_id → users.id</text>
+
+  <line class="link" x1="360" y1="475" x2="520" y2="290" />
+  <circle class="dot" cx="360" cy="475" r="4" />
+  <circle class="dot" cx="520" cy="290" r="4" />
+  <text class="note" x="390" y="440">user_chat_permissions.user_id → users.id</text>
+  <text class="note" x="390" y="458">user_chat_permissions.chat_id → chats.id</text>
+
+  <line class="link" x1="780" y1="290" x2="900" y2="290" />
+  <circle class="dot" cx="780" cy="290" r="4" />
+  <circle class="dot" cx="900" cy="290" r="4" />
+  <text class="note" x="820" y="275">chats.bot_id → bots.id</text>
+
+  <line class="link" x1="780" y1="330" x2="900" y2="490" />
+  <circle class="dot" cx="780" cy="330" r="4" />
+  <circle class="dot" cx="900" cy="490" r="4" />
+  <text class="note" x="810" y="440">bots.created_by → users.id</text>
+</svg>
