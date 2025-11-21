@@ -16,14 +16,17 @@ const (
 	alertTTL = 30 * 24 * time.Hour // 30 days
 )
 
-type Store interface {
-	// Alert methods
+// AlertStore handles alert operations (Redis)
+type AlertStore interface {
 	AddAlert(ctx context.Context, source, level, title, message string) (models.Alert, error)
 	GetAlerts(ctx context.Context) ([]models.Alert, error)
 	SearchAlerts(ctx context.Context, query, level, source string) ([]models.Alert, error)
 	ClearAlerts(ctx context.Context) error
 	Subscribe(ctx context.Context) *redis.PubSub
+}
 
+// AdminStore handles admin operations (PostgreSQL)
+type AdminStore interface {
 	// User methods
 	CreateUser(ctx context.Context, username, password, role string) (models.User, error)
 	GetUser(ctx context.Context, id int) (models.User, error)

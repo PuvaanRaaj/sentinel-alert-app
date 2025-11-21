@@ -33,7 +33,7 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user by username
-	user, err := h.Store.GetUserByUsername(r.Context(), req.Username)
+	user, err := h.AdminStore.GetUserByUsername(r.Context(), req.Username)
 	if err != nil {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
@@ -107,10 +107,10 @@ func GetCurrentUser(r *http.Request) (int, string, string) {
 
 // InitSession initializes a default admin user if none exists
 func (h *Handler) InitSession(ctx context.Context) {
-	users, err := h.Store.GetUsers(ctx)
+	users, err := h.AdminStore.GetUsers(ctx)
 	if err != nil || len(users) == 0 {
 		// Create default admin
-		user, err := h.Store.CreateUser(ctx, "admin", "admin123", "admin")
+		user, err := h.AdminStore.CreateUser(ctx, "admin", "admin123", "admin")
 		if err != nil {
 			log.Println("Failed to create default admin:", err)
 		} else {

@@ -1,0 +1,255 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	_ "embed"
+	"errors"
+	"fmt"
+
+	"incident-viewer-go/internal/models"
+
+	_ "github.com/lib/pq"
+)
+
+//go:embed schema.sql
+var schemaSQL string
+
+type PostgresStore struct {
+	db *sql.DB
+}
+
+func NewPostgresStore(databaseURL string) (*PostgresStore, error) {
+	db, err := sql.Open("postgres", databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	return &PostgresStore{db: db}, nil
+}
+
+// RunMigrations creates tables if they don't exist
+func (s *PostgresStore) RunMigrations(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, schemaSQL)
+	return err
+}
+
+// User methods
+
+func (s *PostgresStore) CreateUser(ctx context.Context, username, password, role string) (models.User, error) {
+	passwordHash, err := models.HashPassword(password)
+	if err != nil {
+		return models.User{}, err
+	}
+
+	var user models.User
+	err = s.db.QueryRowContext(ctx,
+		`INSERT INTO users (username, password_hash, role, created_at) 
+		 VALUES ($1, $2, $3, NOW()) 
+		 RETURNING id, username, password_hash, role, created_at`,
+		username, passwordHash, role,
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt)
+
+	if err != nil {
+		return models.User{}, err
+	}
+
+	return user, nil
+}
+
+func (s *PostgresStore) GetUser(ctx context.Context, id int) (models.User, error) {
+	var user models.User
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, username, password_hash, role, created_at FROM users WHERE id = $1`,
+		id,
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return models.User{}, errors.New("user not found")
+	}
+	return user, err
+}
+
+func (s *PostgresStore) GetUserByUsername(ctx context.Context, username string) (models.User, error) {
+	var user models.User
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, username, password_hash, role, created_at FROM users WHERE username = $1`,
+		username,
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return models.User{}, errors.New("user not found")
+	}
+	return user, err
+}
+
+func (s *PostgresStore) GetUsers(ctx context.Context) ([]models.User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, username, password_hash, role, created_at FROM users ORDER BY created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt); err != nil {
+			continue
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+func (s *PostgresStore) UpdateUser(ctx context.Context, id int, username, role string) error {
+	result, err := s.db.ExecContext(ctx,
+		`UPDATE users SET username = $1, role = $2 WHERE id = $3`,
+		username, role, id,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return errors.New("user not found")
+	}
+
+	return nil
+}
+
+func (s *PostgresStore) DeleteUser(ctx context.Context, id int) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, id)
+	return err
+}
+
+// Bot methods
+
+func (s *PostgresStore) CreateBot(ctx context.Context, name string, createdBy int) (models.Bot, error) {
+	token, err := models.GenerateToken()
+	if err != nil {
+		return models.Bot{}, err
+	}
+
+	var bot models.Bot
+	err = s.db.QueryRowContext(ctx,
+		`INSERT INTO bots (token, name, created_by, created_at) 
+		 VALUES ($1, $2, $3, NOW()) 
+		 RETURNING id, token, name, created_by, created_at`,
+		token, name, createdBy,
+	).Scan(&bot.ID, &bot.Token, &bot.Name, &bot.CreatedBy, &bot.CreatedAt)
+
+	return bot, err
+}
+
+func (s *PostgresStore) GetBot(ctx context.Context, id int) (models.Bot, error) {
+	var bot models.Bot
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, token, name, created_by, created_at FROM bots WHERE id = $1`,
+		id,
+	).Scan(&bot.ID, &bot.Token, &bot.Name, &bot.CreatedBy, &bot.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return models.Bot{}, errors.New("bot not found")
+	}
+	return bot, err
+}
+
+func (s *PostgresStore) GetBotByToken(ctx context.Context, token string) (models.Bot, error) {
+	var bot models.Bot
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, token, name, created_by, created_at FROM bots WHERE token = $1`,
+		token,
+	).Scan(&bot.ID, &bot.Token, &bot.Name, &bot.CreatedBy, &bot.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return models.Bot{}, errors.New("bot not found")
+	}
+	return bot, err
+}
+
+func (s *PostgresStore) GetBots(ctx context.Context) ([]models.Bot, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, token, name, created_by, created_at FROM bots ORDER BY created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bots []models.Bot
+	for rows.Next() {
+		var bot models.Bot
+		if err := rows.Scan(&bot.ID, &bot.Token, &bot.Name, &bot.CreatedBy, &bot.CreatedAt); err != nil {
+			continue
+		}
+		bots = append(bots, bot)
+	}
+
+	return bots, nil
+}
+
+func (s *PostgresStore) DeleteBot(ctx context.Context, id int) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM bots WHERE id = $1`, id)
+	return err
+}
+
+// Chat methods
+
+func (s *PostgresStore) CreateChat(ctx context.Context, chatID, name string, botID int) (models.Chat, error) {
+	var chat models.Chat
+	err := s.db.QueryRowContext(ctx,
+		`INSERT INTO chats (chat_id, name, bot_id, created_at) 
+		 VALUES ($1, $2, $3, NOW()) 
+		 RETURNING id, chat_id, name, bot_id, created_at`,
+		chatID, name, botID,
+	).Scan(&chat.ID, &chat.ChatID, &chat.Name, &chat.BotID, &chat.CreatedAt)
+
+	return chat, err
+}
+
+func (s *PostgresStore) GetChat(ctx context.Context, id int) (models.Chat, error) {
+	var chat models.Chat
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, chat_id, name, bot_id, created_at FROM chats WHERE id = $1`,
+		id,
+	).Scan(&chat.ID, &chat.ChatID, &chat.Name, &chat.BotID, &chat.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return models.Chat{}, errors.New("chat not found")
+	}
+	return chat, err
+}
+
+func (s *PostgresStore) GetChats(ctx context.Context) ([]models.Chat, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, chat_id, name, bot_id, created_at FROM chats ORDER BY created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var chats []models.Chat
+	for rows.Next() {
+		var chat models.Chat
+		if err := rows.Scan(&chat.ID, &chat.ChatID, &chat.Name, &chat.BotID, &chat.CreatedAt); err != nil {
+			continue
+		}
+		chats = append(chats, chat)
+	}
+
+	return chats, nil
+}
+
+func (s *PostgresStore) DeleteChat(ctx context.Context, id int) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM chats WHERE id = $1`, id)
+	return err
+}

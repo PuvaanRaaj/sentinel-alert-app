@@ -14,16 +14,18 @@ import (
 )
 
 type Handler struct {
-	Store     store.Store
-	Tmpl      *template.Template
-	AdminTmpl map[string]*template.Template
+	AlertStore store.AlertStore
+	AdminStore store.AdminStore
+	Tmpl       *template.Template
+	AdminTmpl  map[string]*template.Template
 }
 
-func NewHandler(s store.Store, tmpl *template.Template, adminTmpl map[string]*template.Template) *Handler {
+func NewHandler(alertStore store.AlertStore, adminStore store.AdminStore, tmpl *template.Template, adminTmpl map[string]*template.Template) *Handler {
 	return &Handler{
-		Store:     s,
-		Tmpl:      tmpl,
-		AdminTmpl: adminTmpl,
+		AlertStore: alertStore,
+		AdminStore: adminStore,
+		Tmpl:       tmpl,
+		AdminTmpl:  adminTmpl,
 	}
 }
 
@@ -56,7 +58,7 @@ func (h *Handler) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	alerts, err := h.Store.GetAlerts(r.Context())
+	alerts, err := h.AlertStore.GetAlerts(r.Context())
 	if err != nil {
 		log.Println("Failed to get alerts:", err)
 		http.Error(w, "Failed to get alerts", http.StatusInternalServerError)
@@ -75,7 +77,7 @@ func (h *Handler) SSEHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	// Subscribe to Redis channel
-	pubsub := h.Store.Subscribe(r.Context())
+	pubsub := h.AlertStore.Subscribe(r.Context())
 	defer pubsub.Close()
 
 	ch := pubsub.Channel()
@@ -161,7 +163,7 @@ func (h *Handler) WebhookHandler(w http.ResponseWriter, r *http.Request) {
 		message = string(buf)
 	}
 
-	a, err := h.Store.AddAlert(r.Context(), source, level, title, message)
+	a, err := h.AlertStore.AddAlert(r.Context(), source, level, title, message)
 	if err != nil {
 		log.Println("Failed to add alert:", err)
 		http.Error(w, "Failed to add alert", http.StatusInternalServerError)
@@ -233,7 +235,7 @@ func (h *Handler) TelegramHandler(w http.ResponseWriter, r *http.Request) {
 		text = "(empty message)"
 	}
 
-	a, err := h.Store.AddAlert(r.Context(), source, level, title, text)
+	a, err := h.AlertStore.AddAlert(r.Context(), source, level, title, text)
 	if err != nil {
 		log.Println("Failed to add alert:", err)
 		http.Error(w, "Failed to add alert", http.StatusInternalServerError)
@@ -268,7 +270,7 @@ func (h *Handler) ClearHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	h.Store.ClearAlerts(r.Context())
+	h.AlertStore.ClearAlerts(r.Context())
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -277,7 +279,7 @@ func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
 	level := r.URL.Query().Get("level")
 	source := r.URL.Query().Get("source")
 
-	alerts, err := h.Store.SearchAlerts(r.Context(), query, level, source)
+	alerts, err := h.AlertStore.SearchAlerts(r.Context(), query, level, source)
 	if err != nil {
 		log.Println("Search error:", err)
 		http.Error(w, "Search failed", http.StatusInternalServerError)

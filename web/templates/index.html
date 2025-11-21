@@ -143,19 +143,42 @@
 
     <script>
         // --- State ---
-        const channels = [
-            { id: 'general', name: 'General' },
-            { id: 'deployments', name: 'Deployments' },
-            { id: 'server-logs', name: 'Server Logs' },
-            { id: 'critical-errors', name: 'Critical Errors' }
+        let channels = [
+            { id: 'general', name: 'General', icon: 'hash' }
         ];
         let currentChannelId = 'general';
-        let alerts = []; // Store all alerts locally
+        let alerts = [];
+
+        // Load chats from API
+        async function loadChats() {
+            try {
+                const res = await fetch('/api/chats');
+                const data = await res.json();
+                const chats = data.chats || [];
+                
+                // Add each chat as a channel
+                chats.forEach(chat => {
+                    channels.push({
+                        id: chat.chat_id,
+                        name: chat.name,
+                        icon: 'message-square',
+                        chatData: chat
+                    });
+                });
+                
+                renderChannels();
+            } catch (err) {
+                console.error('Failed to load chats:', err);
+            }
+        }
+
+        // Initialize all alerts locally
         let searchQuery = '';
         let searchTimeout = null;
 
         // --- Initialization ---
         lucide.createIcons();
+        loadChats();
         renderChannels();
         
         // Search input listener with debounce
@@ -228,7 +251,7 @@
             container.innerHTML = channels.map(ch => `
                 <button onclick="switchChannel('${ch.id}')" 
                     class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${currentChannelId === ch.id ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}">
-                    <i data-lucide="hash" class="w-4 h-4 opacity-70 ${currentChannelId === ch.id ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}"></i>
+                    <i data-lucide="${ch.icon || 'hash'}" class="w-4 h-4 opacity-70 ${currentChannelId === ch.id ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}"></i>
                     <span class="font-medium text-sm">${ch.name}</span>
                 </button>
             `).join('');
@@ -272,17 +295,21 @@
             if (currentChannelId === 'integration') return;
 
             const container = document.getElementById('messages-container');
-            // Filter alerts for current channel (mock logic: if channel is 'general', show all, else filter by source/title keywords or just show random subset for demo)
-            // In a real app, the alert would have a 'channel' field. 
-            // For this demo, let's assume all alerts go to 'general' unless they have specific keywords.
             
+            // Filter alerts based on current channel
             const filtered = alerts.filter(a => {
-                if (currentChannelId === 'general') return true;
-                // Simple keyword matching for demo purposes
-                const txt = (a.title + a.message + a.source).toLowerCase();
-                if (currentChannelId === 'deployments') return txt.includes('deploy') || txt.includes('release');
-                if (currentChannelId === 'server-logs') return txt.includes('log') || txt.includes('server') || txt.includes('cpu');
-                if (currentChannelId === 'critical-errors') return a.level === 'critical' || a.level === 'error';
+                if (currentChannelId === 'general') {
+                    // General shows all alerts that are NOT specifically for a chat
+                    return !a.source.includes(':chat:');
+                }
+                
+                // For chat channels, filter by chat_id in source
+                // Source format: "bot:{botName}:chat:{chatId}"
+                const chatMatch = a.source.match(/:chat:([^:]+)/);
+                if (chatMatch && chatMatch[1] === currentChannelId) {
+                    return true;
+                }
+                
                 return false;
             });
 

@@ -7,12 +7,13 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // === User Management ===
 
 func (h *Handler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
-	users, err := h.Store.GetUsers(r.Context())
+	users, err := h.AdminStore.GetUsers(r.Context())
 	if err != nil {
 		http.Error(w, "Failed to get users", http.StatusInternalServerError)
 		return
@@ -34,7 +35,7 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.Store.CreateUser(r.Context(), req.Username, req.Password, req.Role)
+	user, err := h.AdminStore.CreateUser(r.Context(), req.Username, req.Password, req.Role)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -62,7 +63,7 @@ func (h *Handler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Store.UpdateUser(r.Context(), id, req.Username, req.Role); err != nil {
+	if err := h.AdminStore.UpdateUser(r.Context(), id, req.Username, req.Role); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -79,7 +80,7 @@ func (h *Handler) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Store.DeleteUser(r.Context(), id); err != nil {
+	if err := h.AdminStore.DeleteUser(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -91,7 +92,7 @@ func (h *Handler) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 // === Bot Management ===
 
 func (h *Handler) GetBotsHandler(w http.ResponseWriter, r *http.Request) {
-	bots, err := h.Store.GetBots(r.Context())
+	bots, err := h.AdminStore.GetBots(r.Context())
 	if err != nil {
 		http.Error(w, "Failed to get bots", http.StatusInternalServerError)
 		return
@@ -112,7 +113,7 @@ func (h *Handler) CreateBotHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID, _, _ := GetCurrentUser(r)
-	bot, err := h.Store.CreateBot(r.Context(), req.Name, userID)
+	bot, err := h.AdminStore.CreateBot(r.Context(), req.Name, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -130,7 +131,7 @@ func (h *Handler) DeleteBotHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Store.DeleteBot(r.Context(), id); err != nil {
+	if err := h.AdminStore.DeleteBot(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -142,7 +143,7 @@ func (h *Handler) DeleteBotHandler(w http.ResponseWriter, r *http.Request) {
 // === Chat Management ===
 
 func (h *Handler) GetChatsHandler(w http.ResponseWriter, r *http.Request) {
-	chats, err := h.Store.GetChats(r.Context())
+	chats, err := h.AdminStore.GetChats(r.Context())
 	if err != nil {
 		http.Error(w, "Failed to get chats", http.StatusInternalServerError)
 		return
@@ -154,9 +155,8 @@ func (h *Handler) GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) CreateChatHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ChatID string `json:"chat_id"`
-		Name   string `json:"name"`
-		BotID  int    `json:"bot_id"`
+		Name  string `json:"name"`
+		BotID int    `json:"bot_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -164,7 +164,10 @@ func (h *Handler) CreateChatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chat, err := h.Store.CreateChat(r.Context(), req.ChatID, req.Name, req.BotID)
+	// Auto-generate unique chat ID
+	chatID := fmt.Sprintf("chat_%d_%d", req.BotID, time.Now().UnixNano())
+
+	chat, err := h.AdminStore.CreateChat(r.Context(), chatID, req.Name, req.BotID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -182,7 +185,7 @@ func (h *Handler) DeleteChatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Store.DeleteChat(r.Context(), id); err != nil {
+	if err := h.AdminStore.DeleteChat(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -199,19 +202,28 @@ func (h *Handler) BotWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract token from path: /bot{token}/sendMessage
+	// Extract token from path: /bot/{token}/sendMessage
 	path := r.URL.Path
-	if !strings.HasPrefix(path, "/bot") || !strings.Contains(path, "/sendMessage") {
-		http.Error(w, "Invalid path", http.StatusNotFound)
+
+	// Remove /bot/ prefix to get token/sendMessage
+	path = strings.TrimPrefix(path, "/bot/")
+
+	// Check if it ends with /sendMessage
+	if !strings.HasSuffix(path, "/sendMessage") {
+		http.Error(w, "Invalid path - must end with /sendMessage", http.StatusNotFound)
 		return
 	}
 
-	// Get token between /bot and /sendMessage
-	token := strings.TrimPrefix(path, "/bot")
-	token = strings.TrimSuffix(token, "/sendMessage")
+	// Get token between start and /sendMessage
+	token := strings.TrimSuffix(path, "/sendMessage")
+
+	if token == "" {
+		http.Error(w, "Missing bot token", http.StatusBadRequest)
+		return
+	}
 
 	// Validate bot token
-	bot, err := h.Store.GetBotByToken(r.Context(), token)
+	bot, err := h.AdminStore.GetBotByToken(r.Context(), token)
 	if err != nil {
 		log.Printf("Invalid bot token: %s", token)
 		http.Error(w, "Invalid bot token", http.StatusUnauthorized)
@@ -229,8 +241,9 @@ func (h *Handler) BotWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create alert
-	alert, err := h.Store.AddAlert(r.Context(), fmt.Sprintf("bot:%s", bot.Name), "info", "Bot Message", req.Text)
+	// Create alert with chat_id in source for filtering
+	source := fmt.Sprintf("bot:%s:chat:%s", bot.Name, req.ChatID)
+	alert, err := h.AlertStore.AddAlert(r.Context(), source, "info", "Bot Message", req.Text)
 	if err != nil {
 		log.Println("AddAlert error:", err)
 		http.Error(w, "Failed to create alert", http.StatusInternalServerError)

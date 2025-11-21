@@ -36,12 +36,31 @@ func main() {
 		}
 	}
 
-	// Initialize store (Redis)
-	s := store.NewRedisStore(&redis.Options{
+	// Initialize Redis store (for alerts)
+	redisStore := store.NewRedisStore(&redis.Options{
 		Addr:     redisAddr,
 		Password: redisPassword,
 		DB:       redisDB,
 	})
+
+	// PostgreSQL Configuration
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL environment variable is required")
+	}
+
+	// Initialize PostgreSQL store (for admin data)
+	pgStore, err := store.NewPostgresStore(databaseURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+	}
+
+	// Run database migrations
+	ctx := context.Background()
+	if err := pgStore.RunMigrations(ctx); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Database migrations completed")
 
 	// Parse templates
 	tmplPath := filepath.Join("web", "templates", "index.html")
@@ -65,11 +84,10 @@ func main() {
 		}
 	}
 
-	// Initialize handlers
-	h := handlers.NewHandler(s, tmpl, adminTmpl)
+	// Initialize handlers with both stores
+	h := handlers.NewHandler(redisStore, pgStore, tmpl, adminTmpl)
 
 	// Initialize default admin user
-	ctx := context.Background()
 	h.InitSession(ctx)
 
 	// Public routes
@@ -79,6 +97,7 @@ func main() {
 	http.HandleFunc("/clear", h.ClearHandler)
 	http.HandleFunc("/events", h.SSEHandler)
 	http.HandleFunc("/api/search", h.SearchHandler)
+	http.HandleFunc("/api/chats", h.GetChatsPublicHandler)
 
 	// Admin routes (login/logout)
 	http.HandleFunc("/admin/login", func(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +171,7 @@ func main() {
 	})))
 
 	// Bot webhook (public)
-	http.HandleFunc("/bot", h.BotWebhookHandler)
+	http.HandleFunc("/bot/", h.BotWebhookHandler)
 
 	// Serve static files (PWA assets)
 	fs := http.FileServer(http.Dir("web/static"))
