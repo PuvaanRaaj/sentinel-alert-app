@@ -67,6 +67,10 @@ type AdminStore interface {
 	// Push Notification methods
 	SavePushSubscription(ctx context.Context, userID int, endpoint, p256dh, auth string) error
 	GetPushSubscriptions(ctx context.Context) ([]models.PushSubscription, error)
+
+	// Audit
+	InsertAudit(ctx context.Context, actorID int, action, targetType string, targetID int, metadata string) error
+	ListAudit(ctx context.Context, limit int) ([]models.AuditLog, error)
 }
 
 type RedisStore struct {

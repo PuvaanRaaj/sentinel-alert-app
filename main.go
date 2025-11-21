@@ -424,6 +424,7 @@ func main() {
 
 	// Admin user management
 	mux.Handle("/api/admin/reset-password", handlers.AuthMiddleware(handlers.AdminMiddleware(http.HandlerFunc(h.AdminResetPasswordHandler))))
+	mux.Handle("/api/admin/audit", handlers.AuthMiddleware(handlers.AdminMiddleware(http.HandlerFunc(h.GetAuditLogs))))
 
 	// Serve sw.js at root for Service Worker scope
 	mux.HandleFunc("/sw.js", func(w http.ResponseWriter, r *http.Request) {

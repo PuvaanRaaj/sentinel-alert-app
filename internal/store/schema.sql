@@ -56,3 +56,14 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
+
+-- Audit Logs
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id SERIAL PRIMARY KEY,
+    actor_id INT,
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id INT,
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);

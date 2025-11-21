@@ -168,6 +168,11 @@ func (h *Handler) AdminResetPasswordHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if actorID, _, _ := GetCurrentUser(r); actorID != 0 {
+		meta, _ := json.Marshal(map[string]any{"user_id": req.UserID})
+		_ = h.AdminStore.InsertAudit(r.Context(), actorID, "reset_password", "user", req.UserID, string(meta))
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"success": true})
 }

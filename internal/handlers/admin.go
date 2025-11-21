@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"incident-viewer-go/internal/models"
 )
 
 // === User Management ===
@@ -81,6 +83,11 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if actorID, _, _ := GetCurrentUser(r); actorID != 0 {
+		meta, _ := json.Marshal(map[string]any{"username": req.Username, "role": req.Role, "chat_ids": req.ChatIDs})
+		_ = h.AdminStore.InsertAudit(r.Context(), actorID, "create_user", "user", user.ID, string(meta))
+	}
+
 	// Assign chat permissions for non-admin users
 	if req.Role != "admin" && len(req.ChatIDs) > 0 {
 		for _, chatID := range req.ChatIDs {
@@ -142,6 +149,11 @@ func (h *Handler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if actorID, _, _ := GetCurrentUser(r); actorID != 0 {
+		meta, _ := json.Marshal(map[string]any{"username": req.Username, "role": req.Role, "chat_ids": req.ChatIDs})
+		_ = h.AdminStore.InsertAudit(r.Context(), actorID, "update_user", "user", id, string(meta))
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"success": true})
 }
@@ -157,6 +169,10 @@ func (h *Handler) DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	if err := h.AdminStore.DeleteUser(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if actorID, _, _ := GetCurrentUser(r); actorID != 0 {
+		_ = h.AdminStore.InsertAudit(r.Context(), actorID, "delete_user", "user", id, "{}")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -193,6 +209,11 @@ func (h *Handler) CreateBotHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if userID != 0 {
+		meta, _ := json.Marshal(map[string]any{"name": req.Name})
+		_ = h.AdminStore.InsertAudit(r.Context(), userID, "create_bot", "bot", bot.ID, string(meta))
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"success": true, "bot": bot})
 }
@@ -208,6 +229,10 @@ func (h *Handler) DeleteBotHandler(w http.ResponseWriter, r *http.Request) {
 	if err := h.AdminStore.DeleteBot(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if actorID, _, _ := GetCurrentUser(r); actorID != 0 {
+		_ = h.AdminStore.InsertAudit(r.Context(), actorID, "delete_bot", "bot", id, "{}")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -247,6 +272,11 @@ func (h *Handler) CreateChatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if actorID, _, _ := GetCurrentUser(r); actorID != 0 {
+		meta, _ := json.Marshal(map[string]any{"name": req.Name, "bot_id": req.BotID, "chat_id": chat.ChatID})
+		_ = h.AdminStore.InsertAudit(r.Context(), actorID, "create_chat", "chat", chat.ID, string(meta))
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"success": true, "chat": chat})
 }
@@ -264,8 +294,32 @@ func (h *Handler) DeleteChatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if actorID, _, _ := GetCurrentUser(r); actorID != 0 {
+		_ = h.AdminStore.InsertAudit(r.Context(), actorID, "delete_chat", "chat", id, "{}")
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"success": true})
+}
+
+// Audit listing
+func (h *Handler) GetAuditLogs(w http.ResponseWriter, r *http.Request) {
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	logs, err := h.AdminStore.ListAudit(r.Context(), limit)
+	if err != nil {
+		http.Error(w, "Failed to load audit logs", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"logs": logs,
+	})
 }
 
 // === Bot Webhook Handler ===

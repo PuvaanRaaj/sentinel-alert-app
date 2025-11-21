@@ -123,6 +123,11 @@ func (h *Handler) Disable2FAHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if actorID, _, _ := GetCurrentUser(r); actorID != 0 {
+		meta, _ := json.Marshal(map[string]any{"user_id": req.UserID})
+		_ = h.AdminStore.InsertAudit(r.Context(), actorID, "disable_2fa", "user", req.UserID, string(meta))
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"success": true, "message": "2FA disabled successfully"})
 }

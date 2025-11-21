@@ -78,7 +78,24 @@
         <!-- System Panel -->
         <div id="panel-system" class="hidden max-w-4xl mx-auto">
             <h2 class="text-2xl font-bold mb-6">System Management</h2>
-            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold flex items-center gap-2"><i data-lucide="activity" class="w-5 h-5 text-emerald-400"></i> Health</h3>
+                        <a href="/metrics" target="_blank" class="text-xs text-blue-400 hover:text-blue-200">View metrics</a>
+                    </div>
+                    <div class="text-sm text-slate-300">/health: <span id="health-status" class="font-semibold text-slate-200">-</span></div>
+                    <div class="text-sm text-slate-300">/ready: <span id="ready-status" class="font-semibold text-slate-200">-</span></div>
+                </div>
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold flex items-center gap-2"><i data-lucide="list" class="w-5 h-5 text-sky-400"></i> Audit Logs</h3>
+                        <button onclick="loadAudit()" class="text-xs px-3 py-1 rounded bg-slate-700 hover:bg-slate-600">Refresh</button>
+                    </div>
+                    <div id="audit-list" class="space-y-2 max-h-56 overflow-y-auto text-sm text-slate-300">Loading...</div>
+                </div>
+            </div>
+
             <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
                 <h3 class="text-lg font-semibold mb-3 flex items-center">
                     <i data-lucide="alert-triangle" class="w-5 h-5 mr-2 text-yellow-500"></i>
@@ -127,6 +144,43 @@
             const data = await res.json();
             chats = data.chats || [];
             renderChats();
+        }
+
+        async function loadHealth() {
+            try {
+                const h = await fetch('/health');
+                document.getElementById('health-status').textContent = h.ok ? 'OK' : `Fail (${h.status})`;
+                const r = await fetch('/ready');
+                document.getElementById('ready-status').textContent = r.ok ? 'Ready' : `Not ready (${r.status})`;
+            } catch {
+                document.getElementById('health-status').textContent = 'Error';
+                document.getElementById('ready-status').textContent = 'Error';
+            }
+        }
+
+        async function loadAudit() {
+            const container = document.getElementById('audit-list');
+            container.textContent = 'Loading...';
+            try {
+                const res = await fetch('/api/admin/audit?limit=30');
+                const data = await res.json();
+                const logs = data.logs || [];
+                if (!logs.length) {
+                    container.textContent = 'No audit entries yet.';
+                    return;
+                }
+                container.innerHTML = logs.map(l => `
+                    <div class="p-2 rounded bg-slate-900/70 border border-slate-800">
+                        <div class="flex items-center justify-between text-xs text-slate-400">
+                            <span>${l.action}</span>
+                            <span>${new Date(l.created_at).toLocaleString()}</span>
+                        </div>
+                        <div class="text-sm text-slate-200 mt-1">Actor: ${l.actor_id || 'n/a'} • Target: ${l.target_type || '-'} ${l.target_id || ''}</div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.textContent = 'Failed to load audit logs';
+            }
         }
 
         function renderUsers() {
@@ -200,7 +254,11 @@
             }
             if (tab === 'bots') loadBots();
             if (tab === 'chats') loadChats();
-            if (tab === 'system') lucide.createIcons(); // Refresh icons for system panel
+            if (tab === 'system') {
+                loadHealth();
+                loadAudit();
+                lucide.createIcons(); // Refresh icons for system panel
+            }
         }
 
         function showModal(title, content) {

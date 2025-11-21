@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"incident-viewer-go/internal/models"
 
@@ -50,6 +52,15 @@ func (s *PostgresStore) RunMigrations(ctx context.Context) error {
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(255);`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT FALSE;`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_password_change TIMESTAMP WITH TIME ZONE DEFAULT NOW();`,
+		`CREATE TABLE IF NOT EXISTS audit_logs (
+			id SERIAL PRIMARY KEY,
+			actor_id INT,
+			action TEXT NOT NULL,
+			target_type TEXT,
+			target_id INT,
+			metadata JSONB,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
 	}
 
 	for _, migration := range migrations {
@@ -466,4 +477,45 @@ func (s *PostgresStore) GetPushSubscriptions(ctx context.Context) ([]models.Push
 		subs = append(subs, sub)
 	}
 	return subs, nil
+}
+
+// Audit logs
+func (s *PostgresStore) InsertAudit(ctx context.Context, actorID int, action, targetType string, targetID int, metadata string) error {
+	var target sql.NullInt64
+	if targetID != 0 {
+		target = sql.NullInt64{Int64: int64(targetID), Valid: true}
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata, created_at)
+		 VALUES ($1, $2, $3, $4, $5, NOW())`,
+		actorID, action, targetType, target, metadata,
+	)
+	return err
+}
+
+func (s *PostgresStore) ListAudit(ctx context.Context, limit int) ([]models.AuditLog, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, COALESCE(actor_id,0), action, COALESCE(target_type,''), COALESCE(target_id,0), COALESCE(metadata,'{}'::jsonb), created_at
+		FROM audit_logs
+		ORDER BY created_at DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []models.AuditLog
+	for rows.Next() {
+		var l models.AuditLog
+		var meta json.RawMessage
+		if err := rows.Scan(&l.ID, &l.ActorID, &l.Action, &l.TargetType, &l.TargetID, &meta, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		l.Metadata = string(meta)
+		logs = append(logs, l)
+	}
+	return logs, nil
 }

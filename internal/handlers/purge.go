@@ -20,6 +20,10 @@ func (h *Handler) PurgeAlertsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if actorID, _, _ := GetCurrentUser(r); actorID != 0 {
+		_ = h.AdminStore.InsertAudit(r.Context(), actorID, "purge_alerts", "system", 0, "{}")
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
