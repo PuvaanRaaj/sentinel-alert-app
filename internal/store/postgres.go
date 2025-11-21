@@ -32,6 +32,10 @@ func NewPostgresStore(databaseURL string) (*PostgresStore, error) {
 	return &PostgresStore{db: db}, nil
 }
 
+func (s *PostgresStore) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
+}
+
 // RunMigrations creates tables if they don't exist and applies schema updates
 func (s *PostgresStore) RunMigrations(ctx context.Context) error {
 	// Create tables
@@ -41,6 +45,8 @@ func (s *PostgresStore) RunMigrations(ctx context.Context) error {
 
 	// Apply migrations for existing tables
 	migrations := []string{
+		`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;`,
+		`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','developer','user'));`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(255);`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT FALSE;`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_password_change TIMESTAMP WITH TIME ZONE DEFAULT NOW();`,

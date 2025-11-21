@@ -186,8 +186,8 @@ func (h *Handler) Verify2FALoginHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Get user's allowed chats
 	var allowedChats []any
-	if user.Role == "admin" {
-		// Admin sees all chats
+	if user.Role == "admin" || user.Role == "developer" {
+		// Admin/developer see all chats
 		chats, _ := h.AdminStore.GetChats(r.Context())
 		for _, chat := range chats {
 			allowedChats = append(allowedChats, map[string]any{
@@ -210,14 +210,22 @@ func (h *Handler) Verify2FALoginHandler(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// Create session after successful 2FA
+	session, _ := sessionStore.Get(r, sessionName)
+	session.Values["user_id"] = user.ID
+	session.Values["username"] = user.Username
+	session.Values["role"] = user.Role
+	session.Save(r, w)
+
 	// Return full login success
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"success": true,
 		"user": map[string]any{
-			"id":       user.ID,
-			"username": user.Username,
-			"role":     user.Role,
+			"id":           user.ID,
+			"username":     user.Username,
+			"role":         user.Role,
+			"totp_enabled": user.TOTPEnabled,
 		},
 		"allowed_chats": allowedChats,
 	})

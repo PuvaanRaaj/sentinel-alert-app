@@ -37,7 +37,7 @@ func (h *Handler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate role
-	if req.Role != "admin" && req.Role != "user" {
+	if req.Role != "admin" && req.Role != "developer" && req.Role != "user" {
 		http.Error(w, "Invalid role", http.StatusBadRequest)
 		return
 	}
@@ -72,6 +72,7 @@ func (h *Handler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Role     string `json:"role"`
+		ChatIDs  []int  `json:"chat_ids"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -79,9 +80,33 @@ func (h *Handler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Role != "admin" && req.Role != "developer" && req.Role != "user" {
+		http.Error(w, "Invalid role", http.StatusBadRequest)
+		return
+	}
+
 	if err := h.AdminStore.UpdateUser(r.Context(), id, req.Username, req.Role); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Manage chat assignments for non-admin roles
+	if req.Role != "admin" && len(req.ChatIDs) > 0 {
+		currentChats, _ := h.AdminStore.GetUserChats(r.Context(), id)
+		desired := make(map[int]struct{})
+		for _, cid := range req.ChatIDs {
+			desired[cid] = struct{}{}
+		}
+		// Remove missing
+		for _, chat := range currentChats {
+			if _, ok := desired[chat.ID]; !ok {
+				_ = h.AdminStore.RemoveChatFromUser(r.Context(), id, chat.ID)
+			}
+		}
+		// Add new
+		for cid := range desired {
+			_ = h.AdminStore.AssignChatToUser(r.Context(), id, cid)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

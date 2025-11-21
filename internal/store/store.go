@@ -28,6 +28,7 @@ type AlertStore interface {
 
 // AdminStore handles admin operations (PostgreSQL)
 type AdminStore interface {
+	Ping(ctx context.Context) error
 	// User methods
 	CreateUser(ctx context.Context, username, password, role string) (models.User, error)
 	GetUser(ctx context.Context, id int) (models.User, error)
@@ -75,6 +76,10 @@ type RedisStore struct {
 func NewRedisStore(opts *redis.Options) *RedisStore {
 	rdb := redis.NewClient(opts)
 	return &RedisStore{client: rdb}
+}
+
+func (s *RedisStore) Ping(ctx context.Context) error {
+	return s.client.Ping(ctx).Err()
 }
 
 func (s *RedisStore) AddAlert(ctx context.Context, source, level, title, message string) (models.Alert, error) {
