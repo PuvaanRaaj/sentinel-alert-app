@@ -1019,15 +1019,24 @@
         }
 
         async function checkPushSubscription() {
-            const reg = await navigator.serviceWorker.ready;
-            const sub = await reg.pushManager.getSubscription();
-            updatePushUI(!!sub);
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                const sub = await reg.pushManager.getSubscription();
+                console.log('Current Subscription:', sub);
+                updatePushUI(!!sub);
+            } catch (err) {
+                console.error('Error checking subscription:', err);
+            }
         }
 
         function updatePushUI(enabled) {
+            console.log('Updating Push UI, enabled:', enabled);
             const statusEl = document.getElementById('profile-push-status');
             const btnEl = document.getElementById('btn-toggle-push');
-            if (!statusEl || !btnEl) return;
+            if (!statusEl || !btnEl) {
+                console.error('Push UI elements not found');
+                return;
+            }
 
             if (enabled) {
                 statusEl.textContent = 'Enabled ✅';
@@ -1045,6 +1054,7 @@
         }
 
         async function togglePushNotifications() {
+            console.log('Toggle Push Notifications clicked');
             try {
                 const reg = await navigator.serviceWorker.ready;
                 const sub = await reg.pushManager.getSubscription();
