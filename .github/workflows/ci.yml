@@ -42,7 +42,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.55.2
-          args: --timeout=5m
+          args: --timeout=5m --modules-download-mode=mod
 
       - name: Run tests with coverage
         run: go test -coverprofile=coverage.out ./...
