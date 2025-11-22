@@ -58,6 +58,10 @@ type statusRecorder struct {
 	status int
 }
 
+type contextKey string
+
+const traceKey contextKey = "trace_id"
+
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
@@ -73,7 +77,7 @@ func (r *statusRecorder) Flush() {
 func tracingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		traceID := fmt.Sprintf("%x", rand.Int63())
-		ctx := context.WithValue(r.Context(), "trace_id", traceID)
+		ctx := context.WithValue(r.Context(), traceKey, traceID)
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r.WithContext(ctx))
