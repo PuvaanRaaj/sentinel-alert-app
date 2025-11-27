@@ -7,19 +7,26 @@ import (
 	"encoding/hex"
 	"io"
 	"net/http"
-	"os"
+
+	// "os" // Commented out - not needed while signature validation is disabled
 	"sync"
 	"time"
 )
 
 // validateSharedSecret checks X-Sentinel-Signature against HMAC-SHA256(body, secret).
 // If WEBHOOK_SECRET is empty, validation is skipped (returns true).
+// NOTE: Signature validation is currently disabled for internal Gatus webhook usage
+// since Gatus uptime monitor cannot calculate signatures for each webhook request.
 func validateSharedSecret(r *http.Request) bool {
-	secret := os.Getenv("WEBHOOK_SECRET")
-	if secret == "" {
-		return true
-	}
-	return validateSignature(r, secret, r.Header.Get("X-Sentinel-Signature"))
+	// Temporarily skip signature validation for internal usage
+	return true
+
+	// Original validation logic (commented out for now)
+	// secret := os.Getenv("WEBHOOK_SECRET")
+	// if secret == "" {
+	// 	return true
+	// }
+	// return validateSignature(r, secret, r.Header.Get("X-Sentinel-Signature"))
 }
 
 // validateSignature validates HMAC for a given secret with timestamp and nonce checks.
