@@ -444,7 +444,8 @@ func main() {
 	mux.Handle("/api/admin/disable-2fa", handlers.AuthMiddleware(handlers.AdminMiddleware(http.HandlerFunc(h.AdminDisable2FAHandler))))
 
 	// Bot webhook (public)
-	mux.Handle("/bot/", wrap(http.HandlerFunc(h.BotWebhookHandler), rateLimitMiddleware(rl), idempotencyMiddleware(idStore), hmacMiddleware(webhookSecret)))
+	// NOTE: HMAC middleware removed for internal Gatus webhook usage
+	mux.Handle("/bot/", wrap(http.HandlerFunc(h.BotWebhookHandler), rateLimitMiddleware(rl), idempotencyMiddleware(idStore)))
 
 	// Push Notification routes
 	mux.Handle("/api/push/vapid-public-key", http.HandlerFunc(h.GetVAPIDKeyHandler))
