@@ -165,6 +165,11 @@
             const data = await res.json();
             chats = data.chats || [];
             renderChats();
+            
+            // Also populate purge dropdown if on system tab
+            if (currentTab === 'system') {
+                populatePurgeChatDropdown();
+            }
         }
 
         async function loadHealth() {
@@ -278,6 +283,7 @@
             if (tab === 'system') {
                 loadHealth();
                 loadAudit();
+                loadChats(); // Load chats for purge dropdown
                 lucide.createIcons(); // Refresh icons for system panel
             }
         }
