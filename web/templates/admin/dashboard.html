@@ -101,11 +101,32 @@
                     <i data-lucide="alert-triangle" class="w-5 h-5 mr-2 text-yellow-500"></i>
                     Alert Management
                 </h3>
-                <p class="text-slate-400 mb-4">Delete all alerts from the system. This action cannot be undone.</p>
-                <button onclick="purgeAlerts()" class="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg flex items-center space-x-2">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    <span>Purge All Alerts</span>
-                </button>
+                <p class="text-slate-400 mb-4">Delete alerts from the system. This action cannot be undone.</p>
+                
+                <!-- Purge Options -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Purge Scope</label>
+                        <select id="purge-scope" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 mb-3">
+                            <option value="all">All Alerts (Entire System)</option>
+                            <option value="chat">Specific Chat Only</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Chat Selection (shown when "Specific Chat" is selected) -->
+                    <div id="chat-purge-selection" class="hidden">
+                        <label class="block text-sm font-medium mb-2">Select Chat</label>
+                        <select id="purge-chat-id" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2">
+                            <option value="">Loading chats...</option>
+                        </select>
+                        <p class="text-xs text-slate-500 mt-1">Only alerts from this chat will be deleted</p>
+                    </div>
+                    
+                    <button onclick="purgeAlerts()" class="w-full px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg flex items-center justify-center space-x-2">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        <span id="purge-button-text">Purge All Alerts</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -581,14 +602,40 @@
         }
 
         async function purgeAlerts() {
-            if (!confirm('⚠️ Are you sure you want to delete ALL alerts?\n\nThis action cannot be undone!')) {
+            const scope = document.getElementById('purge-scope').value;
+            const chatId = document.getElementById('purge-chat-id').value;
+            
+            let confirmMessage = '⚠️ Are you sure you want to delete ALL alerts?\n\nThis action cannot be undone!';
+            let requestBody = {};
+            
+            if (scope === 'chat') {
+                if (!chatId) {
+                    alert('Please select a chat to purge');
+                    return;
+                }
+                const chatName = document.getElementById('purge-chat-id').selectedOptions[0].text;
+                confirmMessage = `⚠️ Are you sure you want to delete all alerts for "${chatName}"?\n\nThis action cannot be undone!`;
+                requestBody = { chat_id: chatId };
+            }
+            
+            if (!confirm(confirmMessage)) {
                 return;
             }
             
             try {
-                const res = await fetch('/api/admin/purge', { method: 'POST' });
+                const res = await fetch('/api/admin/purge', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                
                 if (res.ok) {
-                    alert('✅ All alerts purged successfully');
+                    const data = await res.json();
+                    if (scope === 'chat') {
+                        alert(`✅ Alerts for "${document.getElementById('purge-chat-id').selectedOptions[0].text}" purged successfully`);
+                    } else {
+                        alert('✅ All alerts purged successfully');
+                    }
                 } else {
                     alert('❌ Failed to purge alerts');
                 }
@@ -597,6 +644,44 @@
                 alert('❌ Error: ' + err.message);
             }
         }
+
+        // Update purge UI when scope changes
+        function updatePurgeUI() {
+            const scope = document.getElementById('purge-scope').value;
+            const chatSelection = document.getElementById('chat-purge-selection');
+            const buttonText = document.getElementById('purge-button-text');
+            
+            if (scope === 'chat') {
+                chatSelection.classList.remove('hidden');
+                buttonText.textContent = 'Purge Selected Chat';
+                populatePurgeChatDropdown();
+            } else {
+                chatSelection.classList.add('hidden');
+                buttonText.textContent = 'Purge All Alerts';
+            }
+            
+            lucide.createIcons(); // Refresh icons
+        }
+
+        // Populate chat dropdown for purge
+        function populatePurgeChatDropdown() {
+            const select = document.getElementById('purge-chat-id');
+            if (!chats || chats.length === 0) {
+                select.innerHTML = '<option value="">No chats available</option>';
+                return;
+            }
+            select.innerHTML = chats.map(chat => 
+                `<option value="${chat.chat_id}">${chat.name} (${chat.chat_id})</option>`
+            ).join('');
+        }
+
+        // Add event listener for scope change
+        document.addEventListener('DOMContentLoaded', function() {
+            const scopeSelect = document.getElementById('purge-scope');
+            if (scopeSelect) {
+                scopeSelect.addEventListener('change', updatePurgeUI);
+            }
+        });
 
         // Initialize
         loadUsers();

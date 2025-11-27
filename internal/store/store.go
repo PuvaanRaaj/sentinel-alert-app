@@ -23,6 +23,7 @@ type AlertStore interface {
 	SearchAlerts(ctx context.Context, query, level, source string) ([]models.Alert, error)
 	ClearAlerts(ctx context.Context) error
 	PurgeAllAlerts(ctx context.Context) error
+	PurgeAlertsByChat(ctx context.Context, chatID string) error
 	Subscribe(ctx context.Context) *redis.PubSub
 }
 
@@ -281,6 +282,76 @@ func (s *RedisStore) PurgeAllAlerts(ctx context.Context) error {
 	}
 	if len(sourceKeys) > 0 {
 		s.client.Del(ctx, sourceKeys...)
+	}
+
+	return nil
+}
+
+func (s *RedisStore) PurgeAlertsByChat(ctx context.Context, chatID string) error {
+	// Get all alert keys from timeline
+	keys, err := s.client.ZRevRange(ctx, "alerts:timeline", 0, -1).Result()
+	if err != nil {
+		return err
+	}
+
+	// Track keys to delete
+	keysToDelete := []string{}
+	sourceIndexesToUpdate := make(map[string][]string) // source -> [keys to remove]
+
+	// Filter alerts by chat ID in source
+	for _, key := range keys {
+		val, err := s.client.Get(ctx, key).Result()
+		if err == redis.Nil {
+			continue
+		} else if err != nil {
+			continue
+		}
+
+		var a models.Alert
+		if err := json.Unmarshal([]byte(val), &a); err != nil {
+			continue
+		}
+
+		// Check if source contains the chat ID
+		// Format: bot:{botname}:chat:{chatID}
+		if strings.Contains(a.Source, fmt.Sprintf("chat:%s", chatID)) {
+			keysToDelete = append(keysToDelete, key)
+
+			// Track source indexes to update
+			if a.Source != "" {
+				sourceKey := fmt.Sprintf("alerts:source:%s", strings.ToLower(a.Source))
+				sourceIndexesToUpdate[sourceKey] = append(sourceIndexesToUpdate[sourceKey], key)
+			}
+
+			// Track level indexes to update
+			if a.Level != "" {
+				levelKey := fmt.Sprintf("alerts:level:%s", strings.ToLower(a.Level))
+				sourceIndexesToUpdate[levelKey] = append(sourceIndexesToUpdate[levelKey], key)
+			}
+		}
+	}
+
+	// Delete the alerts
+	if len(keysToDelete) > 0 {
+		pipe := s.client.Pipeline()
+
+		// Delete alert keys
+		pipe.Del(ctx, keysToDelete...)
+
+		// Remove from timeline
+		for _, key := range keysToDelete {
+			pipe.ZRem(ctx, "alerts:timeline", key)
+		}
+
+		// Remove from index sets
+		for indexKey, members := range sourceIndexesToUpdate {
+			for _, member := range members {
+				pipe.SRem(ctx, indexKey, member)
+			}
+		}
+
+		_, err := pipe.Exec(ctx)
+		return err
 	}
 
 	return nil
