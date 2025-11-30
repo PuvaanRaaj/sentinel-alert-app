@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-
 	// "os" // Commented out - not needed while signature validation is disabled
-	"sync"
-	"time"
 )
 
 // validateSharedSecret checks X-Sentinel-Signature against HMAC-SHA256(body, secret).
@@ -63,30 +60,32 @@ func validateSignature(r *http.Request, secret, sig string) bool {
 	*/
 }
 
-var (
-	nonceCache   = make(map[string]time.Time)
-	nonceCacheMu sync.Mutex
-	maxSkew      = 5 * time.Minute
-)
-
-func withinSkew(ts string) bool {
-	t, err := time.Parse(time.RFC3339, ts)
-	if err != nil {
-		return false
-	}
-	now := time.Now()
-	return t.After(now.Add(-maxSkew)) && t.Before(now.Add(maxSkew))
-}
-
-func isReplay(nonce string) bool {
-	nonceCacheMu.Lock()
-	defer nonceCacheMu.Unlock()
-	if nonce == "" {
-		return false
-	}
-	if exp, ok := nonceCache[nonce]; ok && exp.After(time.Now()) {
-		return true
-	}
-	nonceCache[nonce] = time.Now().Add(maxSkew)
-	return false
-}
+// Original replay protection helpers (currently unused while signature validation is disabled):
+//
+// var (
+// nonceCache   = make(map[string]time.Time)
+// nonceCacheMu sync.Mutex
+// maxSkew      = 5 * time.Minute
+// )
+//
+// func withinSkew(ts string) bool {
+// t, err := time.Parse(time.RFC3339, ts)
+// if err != nil {
+// return false
+// }
+// now := time.Now()
+// return t.After(now.Add(-maxSkew)) && t.Before(now.Add(maxSkew))
+// }
+//
+// func isReplay(nonce string) bool {
+// nonceCacheMu.Lock()
+// defer nonceCacheMu.Unlock()
+// if nonce == "" {
+// return false
+// }
+// if exp, ok := nonceCache[nonce]; ok && exp.After(time.Now()) {
+// return true
+// }
+// nonceCache[nonce] = time.Now().Add(maxSkew)
+// return false
+// }
