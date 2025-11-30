@@ -496,8 +496,8 @@ func main() {
 	}()
 
 	// Serve static files (PWA assets)
-	fs := http.FileServer(http.Dir("web/static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
+        fs := http.FileServer(http.Dir("web/static"))
+        mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	port := os.Getenv("PORT")
 	if port == "" {
